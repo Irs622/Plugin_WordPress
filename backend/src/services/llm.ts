@@ -126,7 +126,7 @@ export class GeminiClient implements LlmClient {
   private async attempt(request: LlmRequest, timeoutMs: number): Promise<string> {
     const url = `${this.options.baseUrl}/v1beta/models/${encodeURIComponent(this.options.model)}:generateContent`;
     const generationConfig: Record<string, unknown> = {
-      temperature: 0.2,
+      temperature: 0.35,
       maxOutputTokens: this.options.maxOutputTokens,
       responseMimeType: 'application/json',
       responseSchema: RESPONSE_SCHEMA,

@@ -43,6 +43,10 @@ final class Rest_Controller {
 						'type' => 'string',
 						'enum' => Settings::LANGUAGES,
 					),
+					'history'  => array(
+						'type'     => 'array',
+						'required' => false,
+					),
 				),
 			)
 		);
@@ -80,6 +84,26 @@ final class Rest_Controller {
 			return $this->error( 'wkc_message_too_long', 'too_long', $language, 400 );
 		}
 
+		$history     = array();
+		$raw_history = $request->get_param( 'history' );
+		if ( is_array( $raw_history ) ) {
+			foreach ( array_slice( $raw_history, -4 ) as $item ) {
+				if ( is_array( $item ) && isset( $item['role'], $item['text'] ) && is_string( $item['role'] ) && is_string( $item['text'] ) ) {
+					$role = $item['role'];
+					if ( in_array( $role, array( 'user', 'model' ), true ) ) {
+						$clean_text = trim( preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', wp_check_invalid_utf8( $item['text'] ) ) ?? '' );
+						$max_chars  = 'model' === $role ? self::MAX_ANSWER_CHARS : self::MAX_MESSAGE_CHARS;
+						if ( '' !== $clean_text && mb_strlen( $clean_text ) <= $max_chars ) {
+							$history[] = array(
+								'role' => $role,
+								'text' => $clean_text,
+							);
+						}
+					}
+				}
+			}
+		}
+
 		$ip = $this->client_ip();
 		if ( ! $this->rate_limit_allows( $ip ) ) {
 			return $this->rate_limited( $language, MINUTE_IN_SECONDS );
@@ -87,7 +111,7 @@ final class Rest_Controller {
 
 		// The backend receives an opaque, salted identifier, never the visitor's IP address.
 		$client_id = substr( hash_hmac( 'sha256', $ip, wp_salt( 'auth' ) ), 0, 32 );
-		$result    = Backend_Client::chat( $message, $language, $client_id );
+		$result    = Backend_Client::chat( $message, $language, $client_id, $history );
 
 		if ( is_wp_error( $result ) ) {
 			self::report_backend_failure( 'unreachable', 0 );

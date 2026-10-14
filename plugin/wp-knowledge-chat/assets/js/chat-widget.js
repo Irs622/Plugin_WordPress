@@ -366,11 +366,25 @@
 				if (controller) controller.abort();
 			}, REQUEST_TIMEOUT_MS);
 
+			var payload = { message: question, language: lang };
+			var prevHistory = history.slice(0, -1);
+			var recentHistory = prevHistory
+				.filter(function (m) {
+					return m && !m.isGreeting && (m.role === 'user' || m.role === 'bot') && typeof m.text === 'string';
+				})
+				.slice(-4)
+				.map(function (m) {
+					return { role: m.role === 'bot' ? 'model' : 'user', text: m.text.slice(0, m.role === 'bot' ? 1500 : 500) };
+				});
+			if (recentHistory.length > 0) {
+				payload.history = recentHistory;
+			}
+
 			fetch(config.restUrl, {
 				method: 'POST',
 				credentials: 'omit',
 				headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-				body: JSON.stringify({ message: question, language: lang }),
+				body: JSON.stringify(payload),
 				signal: controller ? controller.signal : undefined
 			})
 				.then(function (res) {

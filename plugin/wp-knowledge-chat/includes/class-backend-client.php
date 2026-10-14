@@ -63,14 +63,23 @@ final class Backend_Client {
 	}
 
 	/**
+	 * @param array<int,array{role:string,text:string}> $history
 	 * @return array{status:int, body:mixed, retry_after:?int}|\WP_Error
 	 */
-	public static function chat( string $message, string $language, string $client_id ) {
+	public static function chat( string $message, string $language, string $client_id, array $history = array() ) {
 		if ( ! self::is_configured() ) {
 			return new \WP_Error( 'wkc_not_configured', 'Backend is not configured.' );
 		}
 
-		$body      = wp_json_encode( array( 'message' => $message, 'language' => $language ) );
+		$payload = array(
+			'message'  => $message,
+			'language' => $language,
+		);
+		if ( ! empty( $history ) ) {
+			$payload['history'] = $history;
+		}
+
+		$body      = wp_json_encode( $payload );
 		$timestamp = (string) time();
 		$nonce     = bin2hex( random_bytes( 16 ) );
 

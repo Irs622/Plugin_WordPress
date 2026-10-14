@@ -23,6 +23,7 @@ Public (anonymous visitors). Same-origin only when an `Origin` header is present
 |---|---|---|
 | `message` | string | required; control characters removed; trimmed; 1–500 characters (multibyte-aware) |
 | `language` | `"en"` \| `"id"` | optional; defaults to the *Default Language* setting |
+| `history` | array | optional; at most 4 turns: `[ { "role": "user" \| "model", "text": string } ]` |
 
 **200 response**: re-validated by WordPress before it reaches the browser.
 
@@ -76,7 +77,7 @@ Server-to-server only. Requires an HMAC signature from the WordPress plugin.
 
 | Status | `code` |
 |---|---|
-| 400 | `invalid_json`, `invalid_request`, `invalid_message`, `message_too_long`, `invalid_language` |
+| 400 | `invalid_json`, `invalid_request`, `invalid_message`, `message_too_long`, `invalid_language`, `invalid_history` |
 | 401 | `unauthorized` (missing/malformed/expired/invalid/replayed signature) |
 | 404 / 405 | `not_found` / `method_not_allowed` (`Allow` header set; CORS preflight is not supported) |
 | 413 | `payload_too_large` (> 8 KiB) |

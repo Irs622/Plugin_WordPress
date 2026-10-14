@@ -3,7 +3,7 @@ import type { SignatureVerifier } from '../lib/auth.js';
 import { HttpError, headerValue, isPlainObject, parseJson, readRawBody, requireJsonContentType, sendJson } from '../lib/http.js';
 import type { Logger } from '../lib/logger.js';
 import type { FixedWindowLimiter } from '../middleware/rate-limit.js';
-import { BudgetExceededError, LANGUAGES, type ChatService, type Language } from '../services/chat.js';
+import { BudgetExceededError, LANGUAGES, type ChatHistoryTurn, type ChatService, type Language } from '../services/chat.js';
 import type { KnowledgeBaseStore } from '../services/knowledge-base.js';
 import { LlmError } from '../services/llm.js';
 
@@ -19,7 +19,7 @@ export interface ChatRouteDeps {
   maxMessageChars: number;
 }
 
-export function validateChatRequest(body: unknown, maxMessageChars: number): { message: string; language: Language } {
+export function validateChatRequest(body: unknown, maxMessageChars: number): { message: string; language: Language; history?: ChatHistoryTurn[] } {
   if (!isPlainObject(body)) {
     throw new HttpError(400, 'invalid_request', 'Request body must be a JSON object.');
   }
@@ -38,7 +38,31 @@ export function validateChatRequest(body: unknown, maxMessageChars: number): { m
   if (typeof language !== 'string' || !(LANGUAGES as readonly string[]).includes(language)) {
     throw new HttpError(400, 'invalid_language', `language must be one of: ${LANGUAGES.join(', ')}.`);
   }
-  return { message, language: language as Language };
+
+  let history: ChatHistoryTurn[] | undefined;
+  if ('history' in body && body.history !== undefined) {
+    if (!Array.isArray(body.history)) {
+      throw new HttpError(400, 'invalid_history', 'history must be an array.');
+    }
+    if (body.history.length > 4) {
+      throw new HttpError(400, 'invalid_history', 'history must contain at most 4 turns.');
+    }
+    history = [];
+    for (const item of body.history) {
+      if (!isPlainObject(item) || (item.role !== 'user' && item.role !== 'model') || typeof item.text !== 'string') {
+        throw new HttpError(400, 'invalid_history', 'Each history item must have role ("user" | "model") and text.');
+      }
+      // eslint-disable-next-line no-control-regex
+      const cleanText = item.text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+      const limit = item.role === 'model' ? 1500 : maxMessageChars;
+      if ([...cleanText].length > limit) {
+        throw new HttpError(400, 'invalid_history', `History text exceeds maximum allowed length.`);
+      }
+      history.push({ role: item.role as 'user' | 'model', text: cleanText });
+    }
+  }
+
+  return { message, language: language as Language, ...(history ? { history } : {}) };
 }
 
 export async function handleChat(req: IncomingMessage, res: ServerResponse, deps: ChatRouteDeps): Promise<void> {
@@ -72,14 +96,14 @@ export async function handleChat(req: IncomingMessage, res: ServerResponse, deps
     }
   }
 
-  const { message, language } = validateChatRequest(parseJson(raw), deps.maxMessageChars);
+  const { message, language, history } = validateChatRequest(parseJson(raw), deps.maxMessageChars);
 
   if (deps.store.size === 0) {
     throw new HttpError(503, 'knowledge_base_unavailable', 'The assistant is not available right now.');
   }
 
   try {
-    const result = await deps.chat.answer(message, language);
+    const result = await deps.chat.answer(message, language, history);
     deps.logger.info('chat_completed', {
       outcome: result.outcome,
       reason: result.reason,

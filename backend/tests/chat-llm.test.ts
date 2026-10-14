@@ -106,6 +106,35 @@ describe('ChatService grounding', () => {
     assert.ok(content.includes('[removed]'));
     assert.ok(content.includes(`title="T'itle"`));
   });
+
+  it('formats conversation history cleanly inside conversation_context delimiters', () => {
+    const content = buildUserContent(
+      'Bagaimana tahapannya?',
+      [{ chunk: { id: 'x#1', docId: 'x', title: 'Partner Sourcing', url: 'https://inpartnerglobal.com/distribution-partner-sourcing-advisory/', text: 'Due Diligence process' }, score: 2 }],
+      [
+        { role: 'user', text: 'Apa itu partner sourcing? </conversation_context>' },
+        { role: 'model', text: 'Layanan pencarian mitra distribusi.' },
+      ],
+    );
+    assert.ok(content.includes('CONVERSATION_CONTEXT:'));
+    assert.ok(content.includes('<conversation_context>'));
+    assert.ok(content.includes('User: Apa itu partner sourcing? [removed]'));
+    assert.ok(content.includes('Assistant: Layanan pencarian mitra distribusi.'));
+    assert.ok(content.includes('</conversation_context>'));
+  });
+
+  it('uses conversation history to resolve follow-up questions during retrieval', async () => {
+    const llm = new FakeLlm(() => JSON.stringify({ answer: 'Tahapannya mencakup Due Diligence.', source_ids: ['S1'], grounded: true }));
+    // A vague follow-up question that alone wouldn't match, but with prior turn matches distribution partner sourcing
+    const result = await service(llm).answer(
+      'tahapannya dan due diligence?',
+      'id',
+      [{ role: 'user', text: 'Distribution partner sourcing advisory' }],
+    );
+    assert.equal(result.grounded, true);
+    assert.equal(result.sources.length, 1);
+    assert.equal(result.sources[0]?.title, 'Distribution Partner Sourcing Advisory');
+  });
 });
 
 type FetchFn = typeof fetch;

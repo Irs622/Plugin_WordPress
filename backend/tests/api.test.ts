@@ -94,6 +94,9 @@ describe('POST /api/chat', () => {
       [{ message: 'a'.repeat(501), language: 'en' }, 400, 'message_too_long'],
       [{ message: 'hello', language: 'fr' }, 400, 'invalid_language'],
       [{ message: 'hello', language: ['en'] }, 400, 'invalid_language'],
+      [{ message: 'hello', history: 'not an array' }, 400, 'invalid_history'],
+      [{ message: 'hello', history: [1, 2, 3, 4, 5] }, 400, 'invalid_history'],
+      [{ message: 'hello', history: [{ role: 'bad', text: 'hi' }] }, 400, 'invalid_history'],
     ];
     for (const [payload, status, code] of cases) {
       const res = await postChat(t.url, payload, { clientId: `malformed-${code}-${status}-${Math.random().toString(36).slice(2)}` });
@@ -101,6 +104,18 @@ describe('POST /api/chat', () => {
       const body = (await assertNoSecrets(res)) as { error: { code: string } };
       assert.equal(body.error.code, code);
     }
+  });
+
+  it('accepts valid history turns with the request', async () => {
+    const res = await postChat(t.url, {
+      message: 'distributors',
+      language: 'en',
+      history: [
+        { role: 'user', text: 'hello' },
+        { role: 'model', text: 'hi there' },
+      ],
+    }, { clientId: 'with-history' });
+    assert.equal(res.status, 200);
   });
 
   it('accepts exactly the maximum message length (counted in characters)', async () => {

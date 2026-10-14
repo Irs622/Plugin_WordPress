@@ -242,6 +242,31 @@ describe('sending messages', () => {
 		await flush();
 		assert.equal(calls[0].body.message, 'What services does Inpartner offer?');
 	});
+
+	it('includes recent conversation history in follow-up requests', async () => {
+		const { calls, flush, type, pressEnter } = await setup({
+			responses: [
+				jsonResponse(200, { answer: 'First answer', grounded: true, sources: [] }),
+				jsonResponse(200, { answer: 'Second answer', grounded: true, sources: [] }),
+			],
+		});
+		type('Question 1');
+		pressEnter();
+		await flush();
+		await flush();
+		assert.equal(calls.length, 1);
+		assert.equal(calls[0].body.history, undefined);
+
+		type('Question 2');
+		pressEnter();
+		await flush();
+		await flush();
+		assert.equal(calls.length, 2);
+		assert.deepEqual(calls[1].body.history, [
+			{ role: 'user', text: 'Question 1' },
+			{ role: 'model', text: 'First answer' },
+		]);
+	});
 });
 
 describe('error states', () => {

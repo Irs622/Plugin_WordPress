@@ -89,6 +89,33 @@ final class RestControllerTest extends TestCase {
 		$this->assertSame( $expected, $h['X-WKC-Signature'] );
 	}
 
+	public function test_valid_question_with_history_is_sanitized_and_forwarded(): void {
+		$this->backend( array( 200, self::GOOD ) );
+		$response = $this->chat(
+			array(
+				'message'  => 'How does it work?',
+				'language' => 'en',
+				'history'  => array(
+					array( 'role' => 'user', 'text' => 'What is advisory?' ),
+					array( 'role' => 'model', 'text' => 'It is corporate advisory.' ),
+				),
+			)
+		);
+
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertCount( 1, $this->calls );
+		$body = json_decode( $this->calls[0]['args']['body'], true );
+		$this->assertSame( 'How does it work?', $body['message'] );
+		$this->assertSame( 'en', $body['language'] );
+		$this->assertSame(
+			array(
+				array( 'role' => 'user', 'text' => 'What is advisory?' ),
+				array( 'role' => 'model', 'text' => 'It is corporate advisory.' ),
+			),
+			$body['history']
+		);
+	}
+
 	public function test_forwarded_for_is_ignored_unless_the_peer_is_a_trusted_proxy(): void {
 		$_SERVER['REMOTE_ADDR'] = '10.0.0.5';
 		$this->add_filter( 'wp_knowledge_chat_rate_limit_per_minute', fn() => 1 );

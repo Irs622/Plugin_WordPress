@@ -36,7 +36,7 @@ const SCOPE_RULES: { kind: ScopeViolation; patterns: RegExp[] }[] = [
       // Case-sensitive: lower-case "dan" is the Indonesian word for "and".
       /\bDAN\b/,
       /\bkunci api\b/i,
-      /<\/?\s*(source|sources|question|system|instructions?)\b/i,
+      /<\/?\s*(source|sources|question|system|instructions?|conversation_context)\b/i,
       /(^|\n)\s*(system|assistant|developer)\s*:/i,
       /\bgrounded\s*[=:]\s*(true|false)\b|\bsource_ids\b/i,
       /\b(unpublished|draft|private|hidden)\s+(pages?|posts?|content|documents?)\b/i,
