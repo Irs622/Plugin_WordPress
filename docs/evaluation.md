@@ -16,7 +16,7 @@ Only (1) has been measured. (2) is **blocked**: no Gemini API key was available.
 | `backend/eval/dataset.json` | 65 | **Design set.** The scope and answer-type rules were written against its categories, so results on it are in-sample. |
 | `backend/eval/holdout.json` | 42 (20 answerable, 22 unanswerable) | **Held-out set.** Written before the rules were implemented and never used for tuning. See *Honesty notes* below. |
 
-Design-set categories: `faq` 15, `paraphrase` 17 (7 Indonesian), `ambiguous` 6, `unsupported` 9, `out_of_scope` 9, `injection` 9. Held-out: FAQ/paraphrase (6 Indonesian), unsupported facts (fees, founder, clients, testimonials, success rate, opening hours, London office), out-of-scope (bonds, currency, capital requirements, contract review, medical, sport, translation, guarantees, VAT, Indonesian stock and licensing questions) and injection.
+Design-set categories: `faq` 15, `paraphrase` 28 (7 Indonesian, 11 Korean), `ambiguous` 6, `unsupported` 12 (3 Korean), `out_of_scope` 13 (4 Korean), `injection` 10 (1 Korean). Held-out: FAQ/paraphrase (6 Indonesian), unsupported facts (fees, founder, clients, testimonials, success rate, opening hours, London office), out-of-scope (bonds, currency, capital requirements, contract review, medical, sport, translation, guarantees, VAT, Indonesian stock and licensing questions) and injection.
 
 Each item has:
 
@@ -77,6 +77,21 @@ Held-out, still reaching the model (6), so they depend on the model declining an
 | h-u20 | Does Inpartner have an office in London? | needs reasoning about absence; matches the office address |
 
 The two held-out answerable misses are retrieval misses that existed before this change: "Where are you based?" (no term overlap) and "Which regions do you cover?" (retrieves home/about instead of the market-entry page).
+
+## Korean (0.2.0, offline, 2026-10-15)
+
+Korean questions are matched against the English pages through `KOREAN_EXPANSIONS` in `src/services/text.ts`; Korean scope and answer-type patterns are in `src/services/scope.ts`.
+
+| Set | Korean answerable reach the model with the expected page | Korean unanswerable stopped before the model |
+|---|---|---|
+| Design (19 Korean items) | 11/11 | 8/8 |
+| Held-out (7 Korean items) | 3/3 | 4/4 |
+
+Whole sets after adding Korean: design 43/43 answerable and 33/33 stopped; held-out 21/23 answerable (91.3%, the runner requires ≥ 90%) and 20/26 stopped. The English and Indonesian results are unchanged.
+
+Held-out note: the held-out set first had 4 answerable Korean items. "새로운 국가에 대한 시장 평가를 해 주시나요?" (market assessment) missed because 평가 was not in the term map. 평가 was added, and the question was **moved to the design set** (`para-ko-11`) because it influenced the map; it is no longer counted as held out.
+
+Not measured: whether the real Gemini model writes good Korean answers (no live run yet). Korean questions that use words outside the term map get the fallback.
 
 ### Honesty notes
 

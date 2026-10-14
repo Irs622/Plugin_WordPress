@@ -194,8 +194,65 @@
 }
 
 #wkc-root .wkc-close:focus-visible,
-#wkc-root .wkc-launcher:focus-visible {
+#wkc-root .wkc-launcher:focus-visible,
+#wkc-root .wkc-lang:focus-visible {
 	outline-color: var(--wkc-accent);
+}
+
+#wkc-root .wkc-headings {
+	flex: 1 1 auto;
+	min-width: 0;
+}
+
+/* Language switcher: a segmented control between the title and the close button. */
+#wkc-root .wkc-langs {
+	flex: none;
+	display: flex;
+	align-self: center;
+	border: 1px solid rgba(255, 255, 255, 0.4);
+	border-radius: 8px;
+	overflow: hidden;
+}
+
+#wkc-root .wkc-lang {
+	min-width: 32px;
+	height: 30px;
+	padding: 0 8px;
+	border: 0;
+	border-radius: 0;
+	background: transparent;
+	color: var(--wkc-brand-contrast);
+	font-size: 12.5px;
+	font-weight: 600;
+	line-height: 1;
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+#wkc-root .wkc-lang + .wkc-lang {
+	border-left: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+#wkc-root .wkc-lang:hover {
+	background: rgba(255, 255, 255, 0.12);
+}
+
+#wkc-root .wkc-lang[aria-pressed="true"] {
+	background: var(--wkc-accent);
+	color: var(--wkc-ink);
+}
+
+/* Korean: Hangul-capable fonts, and line breaks between words rather than inside them. */
+#wkc-root:lang(ko),
+#wkc-root:lang(ko) .wkc-title {
+	font-family: "Open Sans", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+}
+
+#wkc-root:lang(ko) .wkc-bubble,
+#wkc-root:lang(ko) .wkc-footer,
+#wkc-root:lang(ko) .wkc-chip {
+	word-break: keep-all;
+	overflow-wrap: anywhere;
 }
 
 /* Conversation */
@@ -409,6 +466,8 @@
 	background: var(--wkc-brand);
 	color: var(--wkc-brand-contrast);
 	font-weight: 600;
+	white-space: nowrap;
+	flex: none;
 	cursor: pointer;
 }
 
@@ -483,6 +542,11 @@
 		padding-bottom: env(safe-area-inset-bottom);
 	}
 
+	#wkc-root .wkc-lang {
+		min-width: 36px;
+		height: 36px;
+	}
+
 	#wkc-root .wkc-send-label {
 		position: absolute;
 		width: 1px;
@@ -506,6 +570,11 @@
 	#wkc-root .wkc-bubble,
 	#wkc-root .wkc-chip {
 		border: 1px solid CanvasText;
+	}
+
+	#wkc-root .wkc-lang[aria-pressed="true"] {
+		outline: 2px solid CanvasText;
+		outline-offset: -3px;
 	}
 }
 

@@ -204,6 +204,7 @@ final class RestControllerTest extends TestCase {
 			array( array( 'message' => "  \x01\x02 ", 'language' => 'en' ), 400 ),
 			array( array( 'message' => str_repeat( 'a', 501 ), 'language' => 'en' ), 400 ),
 			array( array( 'message' => 'hi', 'language' => 'fr' ), 400 ),
+			array( array( 'message' => 'hi', 'language' => 'kr' ), 400 ),
 			array( array( 'message' => array( 'hi' ), 'language' => 'en' ), 400 ),
 		);
 		foreach ( $cases as [ $body, $status ] ) {
@@ -318,6 +319,16 @@ final class RestControllerTest extends TestCase {
 		$this->backend( new \WP_Error( 'http_request_failed', 'down' ) );
 		$this->assertStringContainsString( 'Asisten sedang tidak tersedia', $this->chat( array( 'message' => 'halo', 'language' => 'id' ) )->get_data()['message'] );
 		$this->assertStringContainsString( 'The assistant is unavailable', $this->chat( array( 'message' => 'hello', 'language' => 'en' ) )->get_data()['message'] );
+		$this->assertStringContainsString( '어시스턴트를 이용할 수 없습니다', $this->chat( array( 'message' => '안녕하세요', 'language' => 'ko' ) )->get_data()['message'] );
+		$this->assertSame( '질문을 입력해 주세요.', $this->chat( array( 'message' => '   ', 'language' => 'ko' ) )->get_data()['message'] );
+	}
+
+	public function test_korean_question_is_forwarded_in_korean(): void {
+		$this->backend( array( 200, self::GOOD ) );
+		$response = $this->chat( array( 'message' => 'Inpartner는 어떤 서비스를 제공하나요?', 'language' => 'ko' ) );
+		$this->assertSame( 200, $response->get_status() );
+		$body = json_decode( $this->calls[0]['args']['body'], true );
+		$this->assertSame( array( 'message' => 'Inpartner는 어떤 서비스를 제공하나요?', 'language' => 'ko' ), $body );
 	}
 
 	public function test_zero_width_characters_are_stripped_and_empty_message_rejected(): void {

@@ -21,7 +21,12 @@ ok() { echo "ok   $*"; }
 ok "sha256 matches $(basename "$ZIP").sha256"
 
 unzip -Z1 "$ZIP" | grep -qE '(^|/)(tests|node_modules|vendor|\.env)(/|$)' && fail "ZIP contains development or secret files"
-ok "ZIP contains no tests, vendor, node_modules or .env"
+# Read the listing once: with pipefail, grep -q closing the pipe early would fail unzip with SIGPIPE.
+LISTING="$(unzip -Z1 "$ZIP")"
+for f in wp-knowledge-chat.pot wp-knowledge-chat-id_ID.mo wp-knowledge-chat-ko_KR.mo; do
+  grep -qx "wp-knowledge-chat/languages/$f" <<<"$LISTING" || fail "ZIP is missing languages/$f"
+done
+ok "ZIP contains the translations and no tests, vendor, node_modules or .env"
 
 mkdir -p "$TARGET"
 [ -d "$TARGET/cache" ] || cp -R "$REPO/.wp-test/cache" "$TARGET/" 2>/dev/null || true
@@ -37,7 +42,7 @@ ok "installed and activated from ZIP"
 "$WP" option get "$OPTION" --format=json | grep -q '"contact_url":"https:\\/\\/inpartnerglobal.com"' || fail "defaults not created on activation"
 ok "activation created default settings"
 
-"$WP" option patch update "$OPTION" greeting_message "Package check greeting" >/dev/null
+"$WP" option patch update "$OPTION" greetings en "Package check greeting" >/dev/null
 "$WP" transient set wkc_rl_package_check 1 300 >/dev/null
 "$WP" plugin deactivate wp-knowledge-chat >/dev/null
 "$WP" option get "$OPTION" --format=json | grep -q 'Package check greeting' || fail "deactivation lost settings"

@@ -49,33 +49,43 @@ final class Admin_Page {
 		add_settings_section( 'wkc_main', __( 'Chat widget', 'wp-knowledge-chat' ), '__return_false', self::SLUG );
 
 		$fields = array(
-			'enabled'          => __( 'Enable Chatbot', 'wp-knowledge-chat' ),
-			'greeting_message' => __( 'Greeting Message', 'wp-knowledge-chat' ),
-			'language'         => __( 'Default Language', 'wp-knowledge-chat' ),
-			'contact_url'      => __( 'Contact URL', 'wp-knowledge-chat' ),
+			'enabled'                 => __( 'Enable Chatbot', 'wp-knowledge-chat' ),
+			'greetings'               => __( 'Greeting Messages', 'wp-knowledge-chat' ),
+			'language'                => __( 'Default Language', 'wp-knowledge-chat' ),
+			'language_switcher'       => __( 'Language Switcher', 'wp-knowledge-chat' ),
+			'detect_browser_language' => __( 'Browser Language', 'wp-knowledge-chat' ),
+			'contact_url'             => __( 'Contact URL', 'wp-knowledge-chat' ),
 		);
 		foreach ( $fields as $key => $label ) {
-			add_settings_field(
-				'wkc_' . $key,
-				$label,
-				array( $this, 'render_field' ),
-				self::SLUG,
-				'wkc_main',
-				array(
-					'key'       => $key,
-					'label_for' => 'enabled' === $key ? 'wkc-enabled' : 'wkc-' . str_replace( '_', '-', $key ),
-				)
-			);
+			$args = array( 'key' => $key );
+			// The greetings row holds one labelled textarea per language, so its heading labels none of them.
+			if ( 'greetings' !== $key ) {
+				$args['label_for'] = 'wkc-' . str_replace( '_', '-', $key );
+			}
+			add_settings_field( 'wkc_' . $key, $label, array( $this, 'render_field' ), self::SLUG, 'wkc_main', $args );
 		}
 	}
 
 	/**
-	 * @param array{key:string,label_for:string} $args Field arguments.
+	 * Language names, each written in its own language (never translated).
+	 *
+	 * @return array<string,string>
+	 */
+	public static function language_names(): array {
+		return array(
+			'en' => 'English',
+			'id' => 'Bahasa Indonesia',
+			'ko' => '한국어',
+		);
+	}
+
+	/**
+	 * @param array{key:string,label_for?:string} $args Field arguments.
 	 */
 	public function render_field( array $args ): void {
 		$settings = Settings::get();
 		$name     = Settings::OPTION . '[' . $args['key'] . ']';
-		$id       = $args['label_for'];
+		$id       = $args['label_for'] ?? 'wkc-' . $args['key'];
 
 		switch ( $args['key'] ) {
 			case 'enabled':
@@ -88,17 +98,26 @@ final class Admin_Page {
 				);
 				break;
 
-			case 'greeting_message':
+			case 'greetings':
+				printf( '<fieldset aria-describedby="%1$s-help"><legend class="screen-reader-text">%2$s</legend>', esc_attr( $id ), esc_html__( 'Greeting Messages', 'wp-knowledge-chat' ) );
+				foreach ( self::language_names() as $lang => $label ) {
+					printf(
+						'<p><label for="%1$s-%2$s">%3$s</label><br /><textarea id="%1$s-%2$s" name="%4$s[%2$s]" rows="3" cols="60" maxlength="%5$d" lang="%2$s">%6$s</textarea></p>',
+						esc_attr( $id ),
+						esc_attr( $lang ),
+						esc_html( $label ),
+						esc_attr( $name ),
+						(int) Settings::GREETING_MAX_CHARS,
+						esc_textarea( $settings['greetings'][ $lang ] )
+					);
+				}
 				printf(
-					'<textarea id="%1$s" name="%2$s" rows="3" cols="60" maxlength="%3$d" required aria-describedby="%1$s-help">%4$s</textarea><p class="description" id="%1$s-help">%5$s</p>',
+					'</fieldset><p class="description" id="%1$s-help">%2$s</p>',
 					esc_attr( $id ),
-					esc_attr( $name ),
-					(int) Settings::GREETING_MAX_CHARS,
-					esc_textarea( $settings['greeting_message'] ),
 					esc_html(
 						sprintf(
 							/* translators: %d: maximum characters. */
-							__( 'Required. Plain text only (HTML is removed). Maximum %d characters.', 'wp-knowledge-chat' ),
+							__( 'Shown when the chat opens, in the visitor\'s language. Plain text only (HTML is removed). Maximum %d characters. Leave a field empty to restore its default.', 'wp-knowledge-chat' ),
 							Settings::GREETING_MAX_CHARS
 						)
 					)
@@ -106,15 +125,26 @@ final class Admin_Page {
 				break;
 
 			case 'language':
-				$options = array(
-					'en' => __( 'English', 'wp-knowledge-chat' ),
-					'id' => __( 'Bahasa Indonesia', 'wp-knowledge-chat' ),
-				);
 				printf( '<select id="%1$s" name="%2$s" aria-describedby="%1$s-help">', esc_attr( $id ), esc_attr( $name ) );
-				foreach ( $options as $value => $label ) {
+				foreach ( self::language_names() as $value => $label ) {
 					printf( '<option value="%1$s" %2$s>%3$s</option>', esc_attr( $value ), selected( $settings['language'], $value, false ), esc_html( $label ) );
 				}
-				printf( '</select><p class="description" id="%1$s-help">%2$s</p>', esc_attr( $id ), esc_html__( 'Interface language and preferred answer language. Source content is not altered.', 'wp-knowledge-chat' ) );
+				printf( '</select><p class="description" id="%1$s-help">%2$s</p>', esc_attr( $id ), esc_html__( 'Interface language and preferred answer language when the visitor has not chosen one. Source content is not altered.', 'wp-knowledge-chat' ) );
+				break;
+
+			case 'language_switcher':
+			case 'detect_browser_language':
+				$texts = array(
+					'language_switcher'       => __( 'Let visitors switch between English, Bahasa Indonesia and 한국어 in the chat header.', 'wp-knowledge-chat' ),
+					'detect_browser_language' => __( 'Start in the visitor\'s browser language when it is supported; otherwise use the default language.', 'wp-knowledge-chat' ),
+				);
+				printf(
+					'<input type="checkbox" id="%1$s" name="%2$s" value="1" %3$s /> <span>%4$s</span>',
+					esc_attr( $id ),
+					esc_attr( $name ),
+					checked( $settings[ $args['key'] ], true, false ),
+					esc_html( $texts[ $args['key'] ] )
+				);
 				break;
 
 			case 'contact_url':

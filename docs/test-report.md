@@ -1,5 +1,7 @@
 # Test report: WP Knowledge Chat 0.1.0 (+ unreleased audit fixes)
 
+> **0.2.0 update (2026-10-15, multilingual):** after adding Korean, the language switcher, browser-language detection, per-language greetings and admin translations, `scripts/test-all.sh` gives: backend 104/104, KB validation 0 errors, design-set evaluation 43/43 answerable and 33/33 stopped, held-out 21/23 and 20/26, phpcs 0 findings, PHPUnit 80/80, widget 30/30, E2E 12/12 HTTP and 15/15 Chrome (including a Korean switch with axe-core at 0 violations), plus the ZIP lifecycle. Korean details: [evaluation.md](evaluation.md#korean-020-offline-2026-10-15). The rest of this report describes the 0.1.0 audit and is unchanged. Real Gemini answers in Korean are **not** yet tested.
+
 **Date:** 2026-10-14 · **Command:** `scripts/test-all.sh` (exit 0; the final run hit a Chrome-startup flake, see Known limitations, and `e2e/run.sh` was re-run twice, both passing) · **Environment:** local only, nothing deployed. Findings and fixes: [audit-report.md](audit-report.md).
 
 ## Test environment (actual, not the reported production baseline)

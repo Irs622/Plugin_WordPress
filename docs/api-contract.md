@@ -22,7 +22,7 @@ Public (anonymous visitors). Same-origin only when an `Origin` header is present
 | Field | Type | Rules |
 |---|---|---|
 | `message` | string | required; control characters removed; trimmed; 1–500 characters (multibyte-aware) |
-| `language` | `"en"` \| `"id"` | optional; defaults to the *Default Language* setting |
+| `language` | `"en"` \| `"id"` \| `"ko"` | optional; defaults to the *Default Language* setting. The widget sends the language the visitor has selected |
 | `history` | array | optional; at most 4 turns: `[ { "role": "user" \| "model", "text": string } ]` |
 
 **200 response**: re-validated by WordPress before it reaches the browser.

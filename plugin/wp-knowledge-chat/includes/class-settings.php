@@ -2,7 +2,7 @@
 /**
  * Settings storage, defaults and server-side validation.
  *
- * All four settings live in a single option (wp_knowledge_chat_settings).
+ * All settings live in a single option (wp_knowledge_chat_settings).
  * Reads always merge with defaults and re-validate each field, so missing,
  * partial or corrupted stored values degrade to safe defaults.
  *
@@ -18,7 +18,10 @@ final class Settings {
 	public const OPTION             = 'wp_knowledge_chat_settings';
 	public const GROUP              = 'wp_knowledge_chat';
 	public const GREETING_MAX_CHARS = 500;
-	public const LANGUAGES          = array( 'en', 'id' );
+	public const LANGUAGES          = array( 'en', 'id', 'ko' );
+
+	/** Greeting used before per-language greetings existed (0.1.x); see get(). */
+	private const LEGACY_DEFAULT_GREETING = "Hello! How can I help you explore Inpartner's services?";
 
 	/** Hosts approved for the contact link and for cited sources. Extend with the filters below. */
 	private const DEFAULT_APPROVED_HOSTS = array( 'inpartnerglobal.com', 'www.inpartnerglobal.com' );
@@ -28,10 +31,25 @@ final class Settings {
 
 	public static function defaults(): array {
 		return array(
-			'enabled'          => true,
-			'greeting_message' => "Hello! How can I help you explore Inpartner's services?",
-			'language'         => 'en',
-			'contact_url'      => 'https://inpartnerglobal.com',
+			'enabled'                 => true,
+			'greetings'               => self::default_greetings(),
+			'language'                => 'en',
+			'contact_url'             => 'https://inpartnerglobal.com',
+			'language_switcher'       => true,
+			'detect_browser_language' => true,
+		);
+	}
+
+	/**
+	 * Built-in greeting per language, used when the admin leaves one empty.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function default_greetings(): array {
+		return array(
+			'en' => self::LEGACY_DEFAULT_GREETING,
+			'id' => 'Halo! Ada yang bisa saya bantu terkait layanan Inpartner?',
+			'ko' => '안녕하세요! Inpartner의 서비스에 대해 무엇을 도와드릴까요?',
 		);
 	}
 
@@ -43,19 +61,33 @@ final class Settings {
 		$stored   = is_array( $stored ) ? $stored : array();
 		$settings = self::defaults();
 
-		if ( array_key_exists( 'enabled', $stored ) && is_bool( $stored['enabled'] ) ) {
-			$settings['enabled'] = $stored['enabled'];
-		} elseif ( array_key_exists( 'enabled', $stored ) && in_array( $stored['enabled'], array( 0, 1, '0', '1' ), true ) ) {
-			$settings['enabled'] = (bool) (int) $stored['enabled'];
-		}
-
-		$greeting = isset( $stored['greeting_message'] ) ? self::validate_greeting( $stored['greeting_message'] ) : null;
-		if ( is_string( $greeting ) ) {
-			$settings['greeting_message'] = $greeting;
+		foreach ( array( 'enabled', 'language_switcher', 'detect_browser_language' ) as $key ) {
+			if ( array_key_exists( $key, $stored ) && is_bool( $stored[ $key ] ) ) {
+				$settings[ $key ] = $stored[ $key ];
+			} elseif ( array_key_exists( $key, $stored ) && in_array( $stored[ $key ], array( 0, 1, '0', '1' ), true ) ) {
+				$settings[ $key ] = (bool) (int) $stored[ $key ];
+			}
 		}
 
 		if ( isset( $stored['language'] ) && in_array( $stored['language'], self::LANGUAGES, true ) ) {
 			$settings['language'] = $stored['language'];
+		}
+
+		$greetings = isset( $stored['greetings'] ) && is_array( $stored['greetings'] ) ? $stored['greetings'] : array();
+		// 0.1.x stored one greeting for the default language. A customised one is
+		// kept for that language; the old built-in English text is not, so an
+		// Indonesian site gets the Indonesian default instead.
+		if ( ! $greetings && isset( $stored['greeting_message'] ) ) {
+			$legacy = self::validate_greeting( $stored['greeting_message'] );
+			if ( is_string( $legacy ) && self::LEGACY_DEFAULT_GREETING !== $legacy ) {
+				$greetings = array( $settings['language'] => $legacy );
+			}
+		}
+		foreach ( self::LANGUAGES as $lang ) {
+			$greeting = isset( $greetings[ $lang ] ) ? self::validate_greeting( $greetings[ $lang ] ) : null;
+			if ( is_string( $greeting ) ) {
+				$settings['greetings'][ $lang ] = $greeting;
+			}
 		}
 
 		$url = isset( $stored['contact_url'] ) ? self::validate_contact_url( $stored['contact_url'] ) : null;
@@ -112,21 +144,44 @@ final class Settings {
 
 		// A checkbox is absent when unticked. Canonical on/off values are accepted;
 		// anything else is rejected and the saved value kept.
-		$enabled = $input['enabled'] ?? false;
-		if ( true === $enabled || in_array( $enabled, array( '1', 1, 'on', 'yes', 'true' ), true ) ) {
-			$clean['enabled'] = true;
-		} elseif ( false === $enabled || in_array( $enabled, array( '0', 0, '', 'off', 'no', 'false' ), true ) ) {
-			$clean['enabled'] = false;
-		} else {
-			self::error( 'enabled', __( 'Enable Chatbot must be checked or unchecked.', 'wp-knowledge-chat' ) );
+		$checkboxes = array(
+			'enabled'                 => __( 'Enable Chatbot must be checked or unchecked.', 'wp-knowledge-chat' ),
+			'language_switcher'       => __( 'Language Switcher must be checked or unchecked.', 'wp-knowledge-chat' ),
+			'detect_browser_language' => __( 'Browser Language must be checked or unchecked.', 'wp-knowledge-chat' ),
+		);
+		foreach ( $checkboxes as $key => $message ) {
+			$value = $input[ $key ] ?? false;
+			if ( true === $value || in_array( $value, array( '1', 1, 'on', 'yes', 'true' ), true ) ) {
+				$clean[ $key ] = true;
+			} elseif ( false === $value || in_array( $value, array( '0', 0, '', 'off', 'no', 'false' ), true ) ) {
+				$clean[ $key ] = false;
+			} else {
+				self::error( $key, $message );
+			}
 		}
 
-		if ( array_key_exists( 'greeting_message', $input ) ) {
-			$greeting = self::validate_greeting( $input['greeting_message'] );
-			if ( is_string( $greeting ) ) {
-				$clean['greeting_message'] = $greeting;
+		if ( array_key_exists( 'greetings', $input ) ) {
+			if ( is_array( $input['greetings'] ) ) {
+				$defaults = self::default_greetings();
+				foreach ( self::LANGUAGES as $lang ) {
+					if ( ! array_key_exists( $lang, $input['greetings'] ) ) {
+						continue;
+					}
+					$raw = $input['greetings'][ $lang ];
+					// An empty field restores the built-in greeting for that language.
+					if ( is_string( $raw ) && '' === trim( $raw ) ) {
+						$clean['greetings'][ $lang ] = $defaults[ $lang ];
+						continue;
+					}
+					$greeting = self::validate_greeting( $raw );
+					if ( is_string( $greeting ) ) {
+						$clean['greetings'][ $lang ] = $greeting;
+					} else {
+						self::error( 'greetings_' . $lang, $greeting->get_error_message() );
+					}
+				}
 			} else {
-				self::error( 'greeting_message', $greeting->get_error_message() );
+				self::error( 'greetings', __( 'Greeting message must be text.', 'wp-knowledge-chat' ) );
 			}
 		}
 
@@ -134,7 +189,7 @@ final class Settings {
 			if ( is_string( $input['language'] ) && in_array( $input['language'], self::LANGUAGES, true ) ) {
 				$clean['language'] = $input['language'];
 			} else {
-				self::error( 'language', __( 'Default language must be English (en) or Indonesian (id).', 'wp-knowledge-chat' ) );
+				self::error( 'language', __( 'Default language must be English (en), Indonesian (id) or Korean (ko).', 'wp-knowledge-chat' ) );
 			}
 		}
 

@@ -72,5 +72,5 @@ BACKEND_URL=https://chat-api.example.com INDEX_API_TOKEN=… npm run kb:push
   | 1.2 | 97% | 64% |
   | 1.5 | 97% | 64% |
 
-- Indonesian support relies on the term map in `src/services/text.ts`. Add terms when the evaluation shows misses.
+- Indonesian and Korean support rely on the term maps in `src/services/text.ts` (`QUERY_EXPANSIONS`, `KOREAN_EXPANSIONS`). Korean terms are matched as substrings of the question, so particles attached to a word (서비스는, 시장에) do not matter. Keep Korean keys at least two syllables to avoid accidental matches. Add terms when the evaluation shows misses.
 - Move to embeddings only if lexical retrieval falls below target as content grows (for example, many articles). The interface (`Bm25Retriever.search`) can be swapped.

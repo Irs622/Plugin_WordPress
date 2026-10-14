@@ -10,6 +10,7 @@
 	'use strict';
 
 	var STORAGE_KEY = 'wkc-history-v1';
+	var LANG_KEY = 'wkc-lang';
 	var MAX_HISTORY = 30;
 	var REQUEST_TIMEOUT_MS = 30000;
 
@@ -19,6 +20,7 @@
 			subtitle: 'AI assistant · answers from inpartnerglobal.com',
 			open: 'Open the Inpartner AI assistant',
 			close: 'Close chat',
+			language: 'Language',
 			inputLabel: 'Type your question',
 			placeholder: 'Ask a question…',
 			send: 'Send',
@@ -47,6 +49,7 @@
 			subtitle: 'Asisten AI · jawaban dari inpartnerglobal.com',
 			open: 'Buka asisten AI Inpartner',
 			close: 'Tutup obrolan',
+			language: 'Bahasa',
 			inputLabel: 'Tulis pertanyaan Anda',
 			placeholder: 'Tulis pertanyaan…',
 			send: 'Kirim',
@@ -69,7 +72,43 @@
 			errRate: 'Anda mengirim pesan terlalu cepat. Silakan tunggu sebentar lalu coba lagi.',
 			errGeneric: 'Asisten sedang tidak tersedia. Silakan coba lagi nanti atau hubungi kami secara langsung.',
 			counter: '{n} dari {max} karakter'
+		},
+		ko: {
+			title: 'Inpartner AI 어시스턴트',
+			subtitle: 'AI 어시스턴트 · inpartnerglobal.com 기반 답변',
+			open: 'Inpartner AI 어시스턴트 열기',
+			close: '채팅 닫기',
+			language: '언어',
+			inputLabel: '질문을 입력하세요',
+			placeholder: '질문을 입력하세요…',
+			send: '보내기',
+			suggestions: '추천 질문',
+			you: '나:',
+			assistant: '어시스턴트:',
+			typing: '어시스턴트가 답변을 준비하고 있습니다…',
+			received: '새 답변이 도착했습니다.',
+			sources: '출처',
+			newTab: '(새 탭에서 열림)',
+			contact: 'Inpartner 팀에 문의하기',
+			contactPrompt: '구체적인 답변이 필요하신가요? Inpartner 팀에 문의하세요',
+			errorLabel: '오류:',
+			retry: '다시 시도',
+			disclaimer: '웹사이트 공개 콘텐츠를 바탕으로 한 자동 답변입니다. 전문적인 조언이나 투자 자문이 아닙니다.',
+			tooLong: '질문이 너무 깁니다. {max}자 이내로 입력해 주세요.',
+			empty: '먼저 질문을 입력해 주세요.',
+			errNetwork: '어시스턴트에 연결할 수 없습니다. 인터넷 연결을 확인한 후 다시 시도해 주세요.',
+			errTimeout: '어시스턴트의 응답이 너무 늦어지고 있습니다. 다시 시도해 주세요.',
+			errRate: '메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해 주세요.',
+			errGeneric: '지금은 어시스턴트를 이용할 수 없습니다. 잠시 후 다시 시도하시거나 직접 문의해 주세요.',
+			counter: '{n} / {max}자'
 		}
+	};
+
+	/** Switcher labels: short visible code plus the language's own name for screen readers. */
+	var LANGUAGE_LABELS = {
+		en: { short: 'EN', name: 'English' },
+		id: { short: 'ID', name: 'Bahasa Indonesia' },
+		ko: { short: '한국어', name: '' }
 	};
 
 	function format(template, values) {
@@ -111,8 +150,53 @@
 		}
 	}
 
+	function readLanguageChoice() {
+		try {
+			return window.localStorage.getItem(LANG_KEY);
+		} catch (e) {
+			return null;
+		}
+	}
+
+	function saveLanguageChoice(code) {
+		try {
+			window.localStorage.setItem(LANG_KEY, code);
+		} catch (e) {
+			/* storage blocked: the choice lasts for this page only */
+		}
+	}
+
+	/** Maps a BCP 47 tag (ko-KR, id, in-ID, en-GB) onto a supported language, or null. */
+	function matchLanguage(tag, languages) {
+		if (typeof tag !== 'string') return null;
+		var primary = tag.toLowerCase().split(/[-_]/)[0];
+		if (primary === 'in') primary = 'id'; // legacy code for Indonesian
+		return languages.indexOf(primary) !== -1 ? primary : null;
+	}
+
+	/** Visitor's earlier choice, then the browser language (when enabled), then the admin default. */
+	function resolveLanguage(config, languages, fallback) {
+		if (config.switcher) {
+			var saved = readLanguageChoice();
+			if (languages.indexOf(saved) !== -1) return saved;
+		}
+		if (config.detectBrowser && window.navigator) {
+			var tags = window.navigator.languages && window.navigator.languages.length ? window.navigator.languages : [window.navigator.language];
+			for (var i = 0; i < tags.length; i++) {
+				var match = matchLanguage(tags[i], languages);
+				if (match) return match;
+			}
+		}
+		return fallback;
+	}
+
 	function createWidget(config) {
-		var lang = config.language === 'id' ? 'id' : 'en';
+		var defaultLang = STRINGS[config.language] ? config.language : 'en';
+		var languages = (Array.isArray(config.languages) ? config.languages : []).filter(function (code, i, all) {
+			return Object.prototype.hasOwnProperty.call(STRINGS, code) && all.indexOf(code) === i;
+		});
+		if (languages.indexOf(defaultLang) === -1) languages.unshift(defaultLang);
+		var lang = resolveLanguage(config, languages, defaultLang);
 		var t = STRINGS[lang];
 		var maxLength = Number(config.maxLength) > 0 ? Number(config.maxLength) : 500;
 		var sourceHosts = Array.isArray(config.sourceHosts) ? config.sourceHosts : [];
@@ -139,32 +223,44 @@
 
 		var header = el('div', { class: 'wkc-header' });
 		var headings = el('div', { class: 'wkc-headings' });
-		headings.appendChild(el('h2', { id: 'wkc-title', class: 'wkc-title' }, t.title));
-		headings.appendChild(el('p', { id: 'wkc-subtitle', class: 'wkc-subtitle' }, t.subtitle));
+		var title = el('h2', { id: 'wkc-title', class: 'wkc-title' }, t.title);
+		var subtitle = el('p', { id: 'wkc-subtitle', class: 'wkc-subtitle' }, t.subtitle);
+		headings.appendChild(title);
+		headings.appendChild(subtitle);
 		var closeBtn = el('button', { type: 'button', class: 'wkc-close', 'aria-label': t.close });
 		closeBtn.appendChild(el('span', { 'aria-hidden': 'true' }, '×'));
 		header.appendChild(headings);
+
+		var switcher = null;
+		if (config.switcher && languages.length > 1) {
+			switcher = el('div', { class: 'wkc-langs', role: 'group', 'aria-label': t.language });
+			languages.forEach(function (code) {
+				var labels = LANGUAGE_LABELS[code] || { short: code.toUpperCase(), name: '' };
+				var btn = el('button', { type: 'button', class: 'wkc-lang', lang: code, 'data-lang': code, 'aria-pressed': 'false' }, labels.short);
+				if (labels.name) btn.appendChild(el('span', { class: 'wkc-sr-only' }, ' ' + labels.name));
+				btn.addEventListener('click', function () {
+					if (code === lang) return;
+					saveLanguageChoice(code);
+					applyLanguage(code);
+				});
+				switcher.appendChild(btn);
+			});
+			header.appendChild(switcher);
+		}
 		header.appendChild(closeBtn);
 
 		var log = el('div', { class: 'wkc-log', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': t.title, tabindex: '0' });
 		var status = el('div', { class: 'wkc-sr-only', role: 'status', 'aria-live': 'polite' });
 
 		var suggestions = el('div', { class: 'wkc-suggestions', role: 'group', 'aria-label': t.suggestions });
-		(Array.isArray(config.suggestions) ? config.suggestions : []).slice(0, 4).forEach(function (q) {
-			if (typeof q !== 'string' || !q) return;
-			var chip = el('button', { type: 'button', class: 'wkc-chip' }, q);
-			chip.addEventListener('click', function () {
-				submit(q);
-			});
-			suggestions.appendChild(chip);
-		});
 
 		var form = el('form', { class: 'wkc-form', novalidate: 'novalidate' });
 		var label = el('label', { for: 'wkc-input', class: 'wkc-sr-only' }, t.inputLabel);
 		var input = el('textarea', { id: 'wkc-input', class: 'wkc-input', rows: '1', maxlength: String(maxLength), placeholder: t.placeholder, 'aria-describedby': 'wkc-counter wkc-form-error', autocomplete: 'off' });
 		var sendBtn = el('button', { type: 'submit', class: 'wkc-send' });
 		sendBtn.appendChild(sendIcon());
-		sendBtn.appendChild(el('span', { class: 'wkc-send-label' }, t.send));
+		var sendLabel = el('span', { class: 'wkc-send-label' }, t.send);
+		sendBtn.appendChild(sendLabel);
 		var meta = el('div', { class: 'wkc-form-meta' });
 		var formError = el('p', { id: 'wkc-form-error', class: 'wkc-form-error', role: 'alert' });
 		var counter = el('p', { id: 'wkc-counter', class: 'wkc-counter' }, format(t.counter, { n: 0, max: maxLength }));
@@ -178,10 +274,6 @@
 		form.appendChild(meta);
 
 		var footer = el('div', { class: 'wkc-footer' });
-		if (contactUrl) {
-			footer.appendChild(externalLink(contactUrl, t.contact, 'wkc-contact'));
-		}
-		footer.appendChild(el('p', { class: 'wkc-disclaimer' }, t.disclaimer));
 
 		panel.appendChild(header);
 		panel.appendChild(log);
@@ -285,6 +377,72 @@
 			item.appendChild(bubble);
 			log.appendChild(item);
 			log.scrollTop = log.scrollHeight;
+		}
+
+		function greetingFor(code) {
+			if (config.greetings && typeof config.greetings[code] === 'string') return config.greetings[code];
+			return typeof config.greeting === 'string' ? config.greeting : '';
+		}
+
+		function suggestionsFor(code) {
+			if (Array.isArray(config.suggestions)) return config.suggestions;
+			return config.suggestions && Array.isArray(config.suggestions[code]) ? config.suggestions[code] : [];
+		}
+
+		var greetingItem = null;
+		function renderGreeting() {
+			if (greetingItem) greetingItem.remove();
+			greetingItem = null;
+			var text = greetingFor(lang);
+			if (!text) return;
+			greetingItem = renderMessage({ role: 'bot', text: text, grounded: true, isGreeting: true });
+			log.insertBefore(greetingItem, log.firstChild);
+		}
+
+		function renderSuggestions() {
+			while (suggestions.firstChild) suggestions.removeChild(suggestions.firstChild);
+			suggestionsFor(lang).slice(0, 4).forEach(function (q) {
+				if (typeof q !== 'string' || !q) return;
+				var chip = el('button', { type: 'button', class: 'wkc-chip' }, q);
+				chip.disabled = pending;
+				chip.addEventListener('click', function () {
+					submit(q);
+				});
+				suggestions.appendChild(chip);
+			});
+		}
+
+		function renderFooter() {
+			while (footer.firstChild) footer.removeChild(footer.firstChild);
+			if (contactUrl) footer.appendChild(externalLink(contactUrl, t.contact, 'wkc-contact'));
+			footer.appendChild(el('p', { class: 'wkc-disclaimer' }, t.disclaimer));
+		}
+
+		/** Switches every interface string to another language; the conversation is kept. */
+		function applyLanguage(code) {
+			lang = code;
+			t = STRINGS[code];
+			root.setAttribute('lang', code);
+			title.textContent = t.title;
+			subtitle.textContent = t.subtitle;
+			closeBtn.setAttribute('aria-label', t.close);
+			launcher.setAttribute('aria-label', panel.hidden ? t.open : t.close);
+			log.setAttribute('aria-label', t.title);
+			suggestions.setAttribute('aria-label', t.suggestions);
+			label.textContent = t.inputLabel;
+			input.setAttribute('placeholder', t.placeholder);
+			sendLabel.textContent = t.send;
+			formError.textContent = '';
+			if (switcher) {
+				switcher.setAttribute('aria-label', t.language);
+				Array.prototype.forEach.call(switcher.querySelectorAll('button'), function (b) {
+					b.setAttribute('aria-pressed', b.getAttribute('data-lang') === code ? 'true' : 'false');
+				});
+			}
+			updateCounter();
+			renderFooter();
+			renderSuggestions();
+			renderGreeting();
 		}
 
 		function renderTyping() {
@@ -487,8 +645,7 @@
 		});
 
 		/* ---------- Initial state ---------- */
-		var greeting = typeof config.greeting === 'string' && config.greeting ? config.greeting : '';
-		if (greeting) renderMessage({ role: 'bot', text: greeting, grounded: true, isGreeting: true });
+		applyLanguage(lang);
 		var restored = restore();
 		if (restored.length) {
 			history = restored;
@@ -496,7 +653,18 @@
 			restored.forEach(renderMessage);
 		}
 
-		return { root: root, open: open, close: close, submit: submit };
+		return {
+			root: root,
+			open: open,
+			close: close,
+			submit: submit,
+			setLanguage: function (code) {
+				if (languages.indexOf(code) !== -1) applyLanguage(code);
+			},
+			getLanguage: function () {
+				return lang;
+			}
+		};
 	}
 
 	function init() {

@@ -12,10 +12,10 @@ trap 'rm -rf "$STAGE"' EXIT
 
 mkdir -p "$STAGE/wp-knowledge-chat" "$OUT"
 cp "$SRC/wp-knowledge-chat.php" "$SRC/uninstall.php" "$SRC/readme.txt" "$STAGE/wp-knowledge-chat/"
-cp -R "$SRC/includes" "$SRC/assets" "$STAGE/wp-knowledge-chat/"
+cp -R "$SRC/includes" "$SRC/assets" "$SRC/languages" "$STAGE/wp-knowledge-chat/"
 find "$STAGE" -name '.DS_Store' -delete
 
-for f in "$STAGE"/wp-knowledge-chat/*.php "$STAGE"/wp-knowledge-chat/includes/*.php; do php -l "$f" >/dev/null; done
+for f in "$STAGE"/wp-knowledge-chat/*.php "$STAGE"/wp-knowledge-chat/includes/*.php "$STAGE"/wp-knowledge-chat/languages/*.php; do php -l "$f" >/dev/null; done
 
 ZIP="$OUT/wp-knowledge-chat-$VERSION.zip"
 rm -f "$ZIP"

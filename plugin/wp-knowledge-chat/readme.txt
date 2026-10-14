@@ -4,7 +4,7 @@ Tags: chatbot, faq, ai assistant, knowledge base, gemini
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.1.0
+Stable tag: 0.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,7 +26,7 @@ The AI provider key never reaches the browser or the WordPress database.
 * Floating chat button and panel. Responsive, with a full-width bottom sheet on mobile.
 * Greeting message, suggested questions, loading indicator, friendly error states with retry, and a fallback with a contact link.
 * Source links for factual answers. Only https links to approved domains are shown.
-* English and Bahasa Indonesia interface.
+* English, Bahasa Indonesia and Korean (한국어) interface, with a language switcher and browser-language detection.
 * Keyboard accessible: Tab, Enter and Escape, visible focus, screen-reader announcements. Checked with axe-core (WCAG 2.1 A/AA).
 * Conversation kept for the browser session only; nothing is stored on the server.
 * Styles scoped to the widget, so they do not affect Elementor layouts or the site navigation.
@@ -61,11 +61,15 @@ The widget stays hidden until both constants are defined and valid.
 **WP Knowledge Chat → Settings** (administrators only, `manage_options`):
 
 * **Enable Chatbot**: show or hide the widget on the public site. When it is off, the chat endpoint also refuses requests.
-* **Greeting Message**: required, plain text, maximum 500 characters. Any HTML is removed.
-* **Default Language**: English (`en`) or Bahasa Indonesia (`id`). Controls the interface language and the preferred answer language.
+* **Greeting Messages**: one per language (English, Bahasa Indonesia, 한국어). Plain text, maximum 500 characters; any HTML is removed. Leave a field empty to restore that language's default.
+* **Default Language**: English (`en`), Bahasa Indonesia (`id`) or Korean (`ko`). Used when the visitor has not chosen a language and their browser language is not supported (or detection is off).
+* **Language Switcher**: show EN · ID · 한국어 buttons in the chat header. The visitor's choice is remembered in the browser.
+* **Browser Language**: start in the visitor's browser language when it is one of the three.
 * **Contact URL**: an absolute `https://` URL on an approved domain (inpartnerglobal.com, www.inpartnerglobal.com, or this site's own domain), without a username/password or a custom port. The URL is never fetched by the server.
 
-All settings are stored in the single option `wp_knowledge_chat_settings`. Invalid values are rejected with an error message, and the previous value is kept. Saving changed settings triggers a LiteSpeed Cache purge (`litespeed_purge_all`), because the greeting, language and contact link are embedded in cached pages.
+All settings are stored in the single option `wp_knowledge_chat_settings`. Invalid values are rejected with an error message, and the previous value is kept. Saving changed settings triggers a LiteSpeed Cache purge (`litespeed_purge_all`), because the greetings, languages and contact link are embedded in cached pages.
+
+The admin screens are translated into Bahasa Indonesia (`id_ID`) and Korean (`ko_KR`); translation files are in `languages/`.
 
 == Frequently Asked Questions ==
 
@@ -119,7 +123,7 @@ No, by design. The chat endpoint is public, and a nonce authorises nothing for a
 == Developer filters ==
 
 * `wp_knowledge_chat_should_load` (bool): whether to load the widget on the current request.
-* `wp_knowledge_chat_suggested_questions` (string[], $language): suggested questions. Maximum 4, each at most 150 characters.
+* `wp_knowledge_chat_suggested_questions` (string[], $language): suggested questions per language (`en`, `id`, `ko`). Maximum 4, each at most 150 characters.
 * `wp_knowledge_chat_allowed_contact_hosts` (string[]): domains allowed for the Contact URL.
 * `wp_knowledge_chat_allowed_source_hosts` (string[]): domains allowed for source links.
 * `wp_knowledge_chat_allowed_origins` (string[]): hostnames allowed to call the chat endpoint from a browser.
@@ -155,10 +159,18 @@ Deactivating keeps the settings. Deleting the plugin from the Plugins screen run
 
 == Changelog ==
 
+= 0.2.0 =
+* Korean (한국어) as a third language: interface, error messages and answers.
+* Language switcher in the chat header, browser-language detection, and a greeting per language.
+* Admin screens translated into Bahasa Indonesia and Korean.
+
 = 0.1.0 =
 * Initial MVP: chat widget, four admin settings, signed REST proxy to the AI backend, rate limiting, source links, fallback, English and Indonesian interface.
 
 == Upgrade Notice ==
+
+= 0.2.0 =
+Adds Korean and a language switcher. The single greeting becomes one greeting per language; a customised greeting is kept for the default language. Purge the page cache after upgrading.
 
 = 0.1.0 =
 First release. Requires the WP Knowledge Chat AI backend and two wp-config.php constants.

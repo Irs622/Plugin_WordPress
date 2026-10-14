@@ -20,7 +20,7 @@ mkdirSync(OUT, { recursive: true });
 const AXE = readFileSync(createRequire(import.meta.url).resolve('axe-core/axe.min.js'), 'utf8');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'wkc-chrome-'))}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', 'about:blank'], { stdio: 'ignore' });
+const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${mkdtempSync(join(tmpdir(), 'wkc-chrome-'))}`, '--no-first-run', '--no-default-browser-check', '--disable-gpu', '--lang=en-US', 'about:blank'], { stdio: 'ignore' });
 
 let ws;
 let id = 0;
@@ -101,7 +101,7 @@ async function load(viewport) {
 	await send('Emulation.setDeviceMetricsOverride', viewport);
 	await send('Page.navigate', { url: `${WP}/` });
 	await waitFor("document.readyState === 'complete' && !!document.querySelector('.wkc-launcher')");
-	await evaluate("sessionStorage.clear(); true");
+	await evaluate("sessionStorage.clear(); localStorage.removeItem('wkc-lang'); true");
 	await send('Page.reload', {});
 	await waitFor("document.readyState === 'complete' && !!document.querySelector('.wkc-launcher')");
 }
@@ -237,6 +237,24 @@ try {
 		assert.ok(await evaluate("document.querySelectorAll('.wkc-msg--user').length >= 2"));
 	});
 
+	await check('language switcher: Korean interface answers a Korean question with sources', async () => {
+		await evaluate("document.querySelector('.wkc-launcher').click(); true");
+		await waitFor("!document.getElementById('wkc-panel').hidden");
+		assert.deepEqual(await evaluate("[...document.querySelectorAll('.wkc-lang')].map(b => b.getAttribute('aria-pressed'))"), ['true', 'false', 'false']);
+		await evaluate("document.querySelector('.wkc-lang[data-lang=\"ko\"]').click(); true");
+		assert.equal(await evaluate("document.getElementById('wkc-root').lang"), 'ko');
+		assert.equal(await evaluate("document.getElementById('wkc-title').textContent"), 'Inpartner AI 어시스턴트');
+		await askViaKeyboard('유통 파트너 발굴 자문은 무엇인가요?');
+		assert.ok(await evaluate("[...document.querySelectorAll('.wkc-msg--bot')].at(-1).querySelectorAll('.wkc-sources a').length >= 1"), 'Korean question retrieves a cited page');
+		await evaluate(`${AXE}; true`);
+		const violations = await evaluate(`axe.run('#wkc-root', { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }).then(r => r.violations.map(v => v.id + ': ' + v.help + ' (' + v.nodes.length + ')'))`);
+		assert.deepEqual(violations, []);
+		await screenshot('10-desktop-korean');
+		await send('Page.reload', {});
+		await waitFor("document.readyState === 'complete' && !!document.querySelector('.wkc-launcher')");
+		assert.equal(await evaluate("document.getElementById('wkc-root').lang"), 'ko', 'choice is remembered');
+	});
+
 	console.log('Mobile (390x844)');
 	await load(MOBILE);
 	await screenshot('07-mobile-closed');
@@ -257,7 +275,7 @@ try {
 	});
 
 	await check('mobile: touch targets are at least 44px', async () => {
-		const sizes = await evaluate("[...document.querySelectorAll('.wkc-send, .wkc-close')].map(b => { const r = b.getBoundingClientRect(); return Math.min(r.width, r.height); })");
+		const sizes = await evaluate("[...document.querySelectorAll('.wkc-send, .wkc-close, .wkc-lang')].map(b => { const r = b.getBoundingClientRect(); return Math.min(r.width, r.height); })");
 		assert.ok(sizes.every((s) => s >= 36), JSON.stringify(sizes));
 	});
 

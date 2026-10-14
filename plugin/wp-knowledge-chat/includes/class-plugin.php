@@ -23,6 +23,7 @@ final class Plugin {
 	}
 
 	public function boot(): void {
+		add_action( 'init', array( self::class, 'load_textdomain' ) );
 		add_action( 'init', array( Settings::class, 'register' ) );
 		// While the stored value equals the registered default, update_option() takes the add_option() path.
 		add_action( 'add_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
@@ -34,6 +35,14 @@ final class Plugin {
 		if ( is_admin() ) {
 			( new Admin_Page() )->hooks();
 		}
+	}
+
+	/**
+	 * Loads admin translations from the plugin's languages/ folder. Translations
+	 * installed in wp-content/languages/plugins/ take precedence.
+	 */
+	public static function load_textdomain(): void {
+		load_plugin_textdomain( 'wp-knowledge-chat', false, dirname( plugin_basename( WP_KNOWLEDGE_CHAT_FILE ) ) . '/languages' );
 	}
 
 	public static function activate(): void {
@@ -48,7 +57,7 @@ final class Plugin {
 	}
 
 	/**
-	 * The greeting, language and contact URL are embedded in every page, and
+	 * The greetings, languages and contact URL are embedded in every page, and
 	 * the enabled flag decides whether the widget is printed at all, so cached
 	 * pages are stale after a settings change. Asks LiteSpeed Cache (when
 	 * active) to purge; the action is a no-op otherwise.
@@ -116,16 +125,23 @@ final class Plugin {
 	 * Public configuration for the widget. Contains no secrets and no backend address.
 	 */
 	public function frontend_config(): array {
-		$settings = Settings::get();
+		$settings    = Settings::get();
+		$suggestions = array();
+		foreach ( Settings::LANGUAGES as $language ) {
+			$suggestions[ $language ] = self::suggested_questions( $language );
+		}
 		return array(
-			'restUrl'      => esc_url_raw( rest_url( Rest_Controller::NAMESPACE . '/chat' ) ),
-			'greeting'     => $settings['greeting_message'],
-			'language'     => $settings['language'],
-			'contactUrl'   => $settings['contact_url'],
-			'maxLength'    => Rest_Controller::MAX_MESSAGE_CHARS,
-			'sourceHosts'  => Settings::approved_source_hosts(),
-			'contactHosts' => Settings::approved_contact_hosts(),
-			'suggestions'  => self::suggested_questions( $settings['language'] ),
+			'restUrl'       => esc_url_raw( rest_url( Rest_Controller::NAMESPACE . '/chat' ) ),
+			'language'      => $settings['language'],
+			'languages'     => Settings::LANGUAGES,
+			'switcher'      => $settings['language_switcher'],
+			'detectBrowser' => $settings['detect_browser_language'],
+			'greetings'     => $settings['greetings'],
+			'contactUrl'    => $settings['contact_url'],
+			'maxLength'     => Rest_Controller::MAX_MESSAGE_CHARS,
+			'sourceHosts'   => Settings::approved_source_hosts(),
+			'contactHosts'  => Settings::approved_contact_hosts(),
+			'suggestions'   => $suggestions,
 		);
 	}
 
@@ -146,13 +162,19 @@ final class Plugin {
 				'Apa itu layanan Distribution Partner Sourcing Advisory?',
 				'Bagaimana cara menghubungi Inpartner?',
 			),
+			'ko' => array(
+				'Inpartner는 어떤 서비스를 제공하나요?',
+				'인도네시아 시장 진출을 어떻게 지원하나요?',
+				'Distribution Partner Sourcing Advisory는 무엇인가요?',
+				'Inpartner에 어떻게 연락할 수 있나요?',
+			),
 		);
 
 		/**
 		 * Filters the suggested questions shown in the widget.
 		 *
 		 * @param string[] $questions Questions for the language.
-		 * @param string   $language  'en' or 'id'.
+		 * @param string   $language  'en', 'id' or 'ko'.
 		 */
 		$questions = apply_filters( 'wp_knowledge_chat_suggested_questions', $defaults[ $language ] ?? $defaults['en'], $language );
 		if ( ! is_array( $questions ) ) {

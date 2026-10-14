@@ -11,8 +11,8 @@ import { missingAnswerType, scopeViolation, unsupportedClaims } from './scope.js
  * client always come from the knowledge base, never from model output.
  */
 
-export type Language = 'en' | 'id';
-export const LANGUAGES: readonly Language[] = ['en', 'id'];
+export type Language = 'en' | 'id' | 'ko';
+export const LANGUAGES: readonly Language[] = ['en', 'id', 'ko'];
 
 export interface Source {
   title: string;
@@ -47,9 +47,37 @@ export class BudgetExceededError extends Error {
 export const FALLBACK_MESSAGES: Record<Language, string> = {
   en: "For more specific details or custom consultation regarding your business needs, the Inpartner advisory team can discuss the right solution directly with you. Please feel free to reach out to our team through the contact link below.",
   id: 'Untuk rincian lebih spesifik atau kebutuhan konsultasi khusus mengenai hal tersebut, tim konsultan Inpartner dapat mendiskusikan langsung solusi yang tepat untuk bisnis Anda. Silakan hubungi tim kami melalui tautan kontak berikut.',
+  ko: '보다 구체적인 내용이나 귀사의 비즈니스에 맞춘 상담이 필요하시면 Inpartner 자문팀이 적합한 해결 방안을 직접 논의해 드릴 수 있습니다. 아래 연락처 링크를 통해 언제든지 저희 팀에 문의해 주세요.',
 };
 
-const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', id: 'Bahasa Indonesia' };
+const LANGUAGE_NAMES: Record<Language, string> = { en: 'English', id: 'Bahasa Indonesia', ko: 'Korean (한국어)' };
+
+const FEW_SHOTS: Record<Language, string> = {
+  en:
+    'FEW-SHOT EXAMPLES:\n' +
+    'Example 1 (Service inquiry):\n' +
+    'User: "Can Inpartner help us find overseas distributors?"\n' +
+    'Response: {"answer": "Certainly! Inpartner provides Distribution Partner Sourcing Advisory. Our team assists with identifying relevant channel partners, conducting thorough due diligence, and structuring commercial terms aligned with your growth goals.", "source_ids": ["S1"], "grounded": true}\n\n' +
+    'Example 2 (Specific details not in sources):\n' +
+    'User: "How much do your advisory services cost?"\n' +
+    'Response: {"answer": "For specific fee structures or custom advisory scopes, the Inpartner consulting team will discuss your project scale directly. Please feel free to get in touch with our team.", "source_ids": [], "grounded": false}',
+  id:
+    'FEW-SHOT EXAMPLES:\n' +
+    'Example 1 (Layanan Inpartner):\n' +
+    'User: "Apakah Inpartner bisa membantu saya mencari distributor di luar negeri?"\n' +
+    'Response: {"answer": "Tentu! Inpartner menyediakan layanan Distribution Partner Sourcing Advisory. Tim kami dapat membantu Anda mengidentifikasi calon mitra yang relevan, melakukan uji kelayakan (due diligence), hingga menyelaraskan kesepakatan komersial sesuai sasaran pertumbuhan bisnis Anda.", "source_ids": ["S1"], "grounded": true}\n\n' +
+    'Example 2 (Informasi tidak lengkap di situs):\n' +
+    'User: "Berapa biaya jasa konsultasi per bulan?"\n' +
+    'Response: {"answer": "Untuk rincian biaya atau kebutuhan konsultasi khusus, tim Inpartner biasanya mendiskusikan skala proyek Anda terlebih dahulu. Silakan hubungi tim kami untuk konsultasi langsung.", "source_ids": [], "grounded": false}',
+  ko:
+    'FEW-SHOT EXAMPLES:\n' +
+    'Example 1 (서비스 문의):\n' +
+    'User: "Inpartner가 해외 유통사를 찾는 데 도움을 줄 수 있나요?"\n' +
+    'Response: {"answer": "물론입니다. Inpartner는 Distribution Partner Sourcing Advisory 서비스를 제공합니다. 저희 팀은 적합한 채널 파트너 발굴, 철저한 실사(Due Diligence), 그리고 귀사의 성장 목표에 맞춘 상업 조건 구성을 지원합니다.", "source_ids": ["S1"], "grounded": true}\n\n' +
+    'Example 2 (사이트에 없는 세부 정보):\n' +
+    'User: "자문 서비스 비용은 얼마인가요?"\n' +
+    'Response: {"answer": "구체적인 비용 구조나 맞춤형 자문 범위는 Inpartner 컨설팅팀이 프로젝트 규모를 먼저 확인한 후 직접 안내해 드립니다. 편하게 저희 팀에 문의해 주세요.", "source_ids": [], "grounded": false}',
+};
 
 export const MAX_ANSWER_CHARS = 1500;
 const MAX_SOURCES = 3;
@@ -60,7 +88,6 @@ export interface ChatHistoryTurn {
 }
 
 export function buildSystemInstruction(language: Language): string {
-  const isId = language === 'id';
   return [
     'You are the Inpartner Business Consultation Assistant, representing Inpartner Global (inpartnerglobal.com).',
     'Your persona is that of a warm, professional, articulate, and consultative business advisor. You speak naturally and empathetically, like an experienced client relations consultant.',
@@ -85,21 +112,7 @@ export function buildSystemInstruction(language: Language): string {
     '   Only write numbers, e-mail addresses or phone numbers that appear verbatim in the SOURCES.',
     '9. If something is general context rather than a fact from the sources, say so explicitly (for example "In general, ...").',
     '',
-    isId
-      ? 'FEW-SHOT EXAMPLES:\n' +
-        'Example 1 (Layanan Inpartner):\n' +
-        'User: "Apakah Inpartner bisa membantu saya mencari distributor di luar negeri?"\n' +
-        'Response: {"answer": "Tentu! Inpartner menyediakan layanan Distribution Partner Sourcing Advisory. Tim kami dapat membantu Anda mengidentifikasi calon mitra yang relevan, melakukan uji kelayakan (due diligence), hingga menyelaraskan kesepakatan komersial sesuai sasaran pertumbuhan bisnis Anda.", "source_ids": ["S1"], "grounded": true}\n\n' +
-        'Example 2 (Informasi tidak lengkap di situs):\n' +
-        'User: "Berapa biaya jasa konsultasi per bulan?"\n' +
-        'Response: {"answer": "Untuk rincian biaya atau kebutuhan konsultasi khusus, tim Inpartner biasanya mendiskusikan skala proyek Anda terlebih dahulu. Silakan hubungi tim kami untuk konsultasi langsung.", "source_ids": [], "grounded": false}'
-      : 'FEW-SHOT EXAMPLES:\n' +
-        'Example 1 (Service inquiry):\n' +
-        'User: "Can Inpartner help us find overseas distributors?"\n' +
-        'Response: {"answer": "Certainly! Inpartner provides Distribution Partner Sourcing Advisory. Our team assists with identifying relevant channel partners, conducting thorough due diligence, and structuring commercial terms aligned with your growth goals.", "source_ids": ["S1"], "grounded": true}\n\n' +
-        'Example 2 (Specific details not in sources):\n' +
-        'User: "How much do your advisory services cost?"\n' +
-        'Response: {"answer": "For specific fee structures or custom advisory scopes, the Inpartner consulting team will discuss your project scale directly. Please feel free to get in touch with our team.", "source_ids": [], "grounded": false}',
+    FEW_SHOTS[language],
     '',
     'Respond with JSON only: {"answer": string, "source_ids": string[], "grounded": boolean}.',
   ].join('\n');

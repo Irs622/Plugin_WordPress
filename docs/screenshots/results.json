@@ -41,6 +41,10 @@
       "ok": true
     },
     {
+      "name": "language switcher: Korean interface answers a Korean question with sources",
+      "ok": true
+    },
+    {
       "name": "mobile: panel fits the viewport without horizontal scroll",
       "ok": true
     },

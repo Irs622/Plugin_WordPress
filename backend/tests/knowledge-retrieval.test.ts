@@ -116,10 +116,23 @@ describe('Bm25Retriever', () => {
     assert.equal(retriever.search('Bagaimana mencari mitra distribusi?', 3, 1)[0]?.chunk.docId, 'page-2-distribution');
   });
 
+  it('maps Korean terms onto English content, with particles attached', () => {
+    const tokens = tokenizeQuery('유통 파트너는 어떻게 찾나요?');
+    assert.ok(tokens.includes('partner') && tokens.includes('distributor'));
+    assert.ok(tokenizeQuery('시장에 진출하고 싶습니다').includes('market'));
+    assert.equal(retriever.search('유통사와 리셀러를 어떻게 찾나요?', 3, 1)[0]?.chunk.docId, 'page-2-distribution');
+    assert.equal(retriever.search('이메일 주소를 알려주세요.', 3, 1)[0]?.chunk.docId, 'page-3-contact');
+  });
+
+  it('matches Korean in decomposed (NFD) form too', () => {
+    assert.ok(tokenizeQuery('유통 파트너'.normalize('NFD')).includes('partner'));
+  });
+
   it('returns nothing for unrelated or empty questions', () => {
     assert.deepEqual(retriever.search('weather forecast tomorrow', 3, 1), []);
     assert.deepEqual(retriever.search('the and of', 3, 1), []);
     assert.deepEqual(retriever.search('', 3, 1), []);
+    assert.deepEqual(retriever.search('맛있는 김치찌개', 3, 1), []);
   });
 });
 

@@ -370,6 +370,13 @@ final class Rest_Controller {
 				'too_long'     => sprintf( 'Pertanyaan maksimal %d karakter.', self::MAX_MESSAGE_CHARS ),
 				'rate_limited' => 'Anda mengirim pesan terlalu cepat. Silakan tunggu sebentar lalu coba lagi.',
 			),
+			'ko' => array(
+				'unavailable'  => '지금은 어시스턴트를 이용할 수 없습니다. 잠시 후 다시 시도하시거나 직접 문의해 주세요.',
+				'forbidden'    => '허용되지 않은 요청입니다.',
+				'invalid'      => '질문을 입력해 주세요.',
+				'too_long'     => sprintf( '질문은 %d자 이내로 입력해 주세요.', self::MAX_MESSAGE_CHARS ),
+				'rate_limited' => '메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해 주세요.',
+			),
 		);
 		$lang = isset( $messages[ $language ] ) ? $language : 'en';
 		return new \WP_Error( $code, $messages[ $lang ][ $kind ], array( 'status' => $status ) );

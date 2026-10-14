@@ -2,7 +2,25 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [0.2.0] - 2026-10-15
+
+### Added
+- **Korean (한국어)** as a third language beside English and Bahasa Indonesia: widget interface, REST error messages, backend fallback text, answer-language instruction and few-shot examples.
+- **Language switcher** in the chat header (EN · ID · 한국어). The visitor's choice is remembered in `localStorage` (`wkc-lang`); the conversation is kept when switching and later questions are sent in the new language.
+- **Browser-language detection**: the widget starts in the visitor's browser language when it is supported (`ko-KR` → Korean, `id`/`in` → Indonesian), otherwise in the default language.
+- **Greeting per language**: three greeting fields (English, Bahasa Indonesia, 한국어). An empty field restores that language's built-in greeting.
+- Settings `language_switcher` and `detect_browser_language` (both on by default).
+- Admin translations: `languages/wp-knowledge-chat.pot` plus Indonesian (`id_ID`) and Korean (`ko_KR`) `.po`/`.mo`/`.l10n.php`, loaded with `load_plugin_textdomain()`; the plugin ZIP includes `languages/`.
+- Korean retrieval: a curated Korean→English term map, matched as substrings because Korean attaches particles to words (서비스는, 시장에). Korean scope rules (prompt injection, investment/tax/legal/medical advice, guarantees, unrelated tasks) and answer-type rules (price, founding, headcount, statistics, clients, hours).
+- Evaluation: 19 Korean questions in the design set and 7 in the held-out set.
+
+### Changed
+- Settings option: `greeting_message` is replaced by `greetings` (`en`/`id`/`ko`). Existing sites are migrated on activation or first read: a customised greeting is kept for the default language, the old built-in English greeting is replaced by each language's default.
+- Widget config: `greeting` → `greetings` (map), `suggestions` is now a map per language, and `languages`, `switcher`, `detectBrowser` were added. The widget still accepts the 0.1 shape, so cached pages keep working.
+- Widget CSS: Hangul-capable font stack and `word-break: keep-all` for Korean; the send button label no longer wraps.
+
+### Fixed
+- E2E: the Indonesian fallback assertion matched text that was changed in an earlier commit; the asset version is read from the plugin header instead of being hard-coded.
 
 ### Security
 - Backend: the Gemini deadline now covers reading the response body; a provider that sent headers and then stalled held the request indefinitely. Provider responses are capped at 256 KiB.

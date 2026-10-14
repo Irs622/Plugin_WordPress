@@ -134,9 +134,9 @@ final class AdminAndWidgetTest extends TestCase {
 			}
 		);
 		// First save after activation: the stored value still equals the registered default.
-		update_option( Settings::OPTION, array( 'greeting_message' => 'Changed greeting' ) + Settings::defaults() );
+		update_option( Settings::OPTION, array( 'greetings' => array( 'ko' => '변경된 인사말' ) ) + Settings::defaults() );
 		$this->assertSame( 1, $purges );
-		update_option( Settings::OPTION, array( 'greeting_message' => 'Changed greeting' ) + Settings::defaults() );
+		update_option( Settings::OPTION, array( 'greetings' => array( 'ko' => '변경된 인사말' ) ) + Settings::defaults() );
 		$this->assertSame( 1, $purges, 'unchanged settings do not purge' );
 		update_option( Settings::OPTION, array( 'enabled' => false ) + Settings::defaults() );
 		$this->assertSame( 2, $purges, 'disabling the widget purges' );
@@ -161,12 +161,16 @@ final class AdminAndWidgetTest extends TestCase {
 
 	public function test_admin_fields_escape_output(): void {
 		wp_set_current_user( $this->user_id( 'admin' ) );
-		update_option( Settings::OPTION, array( 'greeting_message' => 'Say "hi" & <wave> \'now\'', 'contact_url' => 'https://inpartnerglobal.com/contact/?a=1&b="2"' ) + Settings::defaults() );
+		update_option( Settings::OPTION, array( 'greetings' => array( 'id' => 'Say "hi" & <wave> \'now\'' ), 'contact_url' => 'https://inpartnerglobal.com/contact/?a=1&b="2"' ) + Settings::defaults() );
 
 		ob_start();
 		$page = new Admin_Page();
-		foreach ( array( 'enabled', 'greeting_message', 'language', 'contact_url' ) as $key ) {
-			$page->render_field( array( 'key' => $key, 'label_for' => 'wkc-' . $key ) );
+		foreach ( array_keys( Settings::defaults() ) as $key ) {
+			$args = array( 'key' => $key );
+			if ( 'greetings' !== $key ) {
+				$args['label_for'] = 'wkc-' . $key;
+			}
+			$page->render_field( $args );
 		}
 		$html = ob_get_clean();
 
@@ -177,6 +181,32 @@ final class AdminAndWidgetTest extends TestCase {
 		$this->assertStringContainsString( 'value="https://inpartnerglobal.com/contact/?a=1&amp;b=2"', $html );
 		$this->assertStringContainsString( 'name="wp_knowledge_chat_settings[enabled]"', $html );
 		$this->assertStringContainsString( 'maxlength="500"', $html );
+		foreach ( array( 'en', 'id', 'ko' ) as $lang ) {
+			$this->assertStringContainsString( 'name="wp_knowledge_chat_settings[greetings][' . $lang . ']"', $html );
+			$this->assertStringContainsString( '<label for="wkc-greetings-' . $lang . '">', $html );
+			$this->assertStringContainsString( '<option value="' . $lang . '"', $html );
+		}
+		$this->assertStringContainsString( '안녕하세요! Inpartner의 서비스에 대해 무엇을 도와드릴까요?', $html );
+		$this->assertStringContainsString( 'name="wp_knowledge_chat_settings[language_switcher]"', $html );
+		$this->assertStringContainsString( 'name="wp_knowledge_chat_settings[detect_browser_language]"', $html );
+	}
+
+	public function test_admin_strings_are_translated_for_indonesian_and_korean(): void {
+		// The test site has no core language packs, so switch_to_locale() would refuse these locales.
+		$expected = array(
+			'id_ID' => array( 'Pengaturan', 'Pesan Sapaan', 'Uji koneksi' ),
+			'ko_KR' => array( '설정', '인사말', '연결 테스트' ),
+			'en_US' => array( 'Settings', 'Greeting Messages', 'Test connection' ),
+		);
+		foreach ( $expected as $locale => $strings ) {
+			$filter = fn() => $locale;
+			add_filter( 'pre_determine_locale', $filter );
+			unload_textdomain( 'wp-knowledge-chat', true );
+			Plugin::load_textdomain();
+			$this->assertSame( $strings, array( __( 'Settings', 'wp-knowledge-chat' ), __( 'Greeting Messages', 'wp-knowledge-chat' ), __( 'Test connection', 'wp-knowledge-chat' ) ), $locale );
+			remove_filter( 'pre_determine_locale', $filter );
+		}
+		unload_textdomain( 'wp-knowledge-chat', true );
 	}
 
 	public function test_settings_page_contains_settings_nonce_and_no_secret(): void {
@@ -218,7 +248,7 @@ final class AdminAndWidgetTest extends TestCase {
 	}
 
 	public function test_frontend_config_contains_no_secrets_and_is_script_safe(): void {
-		update_option( Settings::OPTION, array( 'greeting_message' => 'Hi </script> "x" & \'y\' a < b' ) + Settings::defaults() );
+		update_option( Settings::OPTION, array( 'greetings' => array( 'en' => 'Hi </script> "x" & \'y\' a < b' ) ) + Settings::defaults() );
 		$this->assertTrue( $this->enqueue() );
 
 		$inline = implode( "\n", (array) wp_scripts()->get_data( Plugin::HANDLE, 'before' ) );
@@ -230,13 +260,28 @@ final class AdminAndWidgetTest extends TestCase {
 		$this->assertStringNotContainsString( 'AIza', $inline );
 
 		$config = Plugin::instance()->frontend_config();
-		$this->assertSame( array( 'restUrl', 'greeting', 'language', 'contactUrl', 'maxLength', 'sourceHosts', 'contactHosts', 'suggestions' ), array_keys( $config ) );
+		$this->assertSame( array( 'restUrl', 'language', 'languages', 'switcher', 'detectBrowser', 'greetings', 'contactUrl', 'maxLength', 'sourceHosts', 'contactHosts', 'suggestions' ), array_keys( $config ) );
 		$this->assertStringEndsWith( '/wp-knowledge-chat/v1/chat', $config['restUrl'] );
 		$this->assertSame( 500, $config['maxLength'] );
+		$this->assertSame( array( 'en', 'id', 'ko' ), $config['languages'] );
+		$this->assertSame( array( 'en', 'id', 'ko' ), array_keys( $config['greetings'] ) );
+		$this->assertSame( array( 'en', 'id', 'ko' ), array_keys( $config['suggestions'] ) );
+		$this->assertTrue( $config['switcher'] );
+		$this->assertTrue( $config['detectBrowser'] );
+	}
+
+	public function test_frontend_config_reflects_language_toggles(): void {
+		update_option( Settings::OPTION, array( 'language' => 'ko', 'language_switcher' => false, 'detect_browser_language' => false ) + Settings::defaults() );
+		$config = Plugin::instance()->frontend_config();
+		$this->assertSame( 'ko', $config['language'] );
+		$this->assertFalse( $config['switcher'] );
+		$this->assertFalse( $config['detectBrowser'] );
 	}
 
 	public function test_suggested_questions_follow_language_and_are_sanitised(): void {
 		$this->assertSame( 'Layanan apa saja yang ditawarkan Inpartner?', Plugin::suggested_questions( 'id' )[0] );
+		$this->assertSame( 'Inpartner는 어떤 서비스를 제공하나요?', Plugin::suggested_questions( 'ko' )[0] );
+		$this->assertCount( 4, Plugin::suggested_questions( 'ko' ) );
 		$this->add_filter(
 			'wp_knowledge_chat_suggested_questions',
 			fn() => array( '<b>Bold?</b>', str_repeat( 'x', 151 ), 42, 'A', 'B', 'C', 'D' )

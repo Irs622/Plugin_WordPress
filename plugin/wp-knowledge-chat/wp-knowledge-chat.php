@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       WP Knowledge Chat
  * Description:       Inpartner AI Business Consultation Assistant: a floating chat widget that answers visitor questions from approved website content via a separate AI backend.
- * Version:           0.1.0
+ * Version:           0.2.0
  * Requires at least: 6.4
  * Requires PHP:      8.1
  * Tested up to:      7.1
@@ -10,13 +10,14 @@
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
  * Text Domain:       wp-knowledge-chat
+ * Domain Path:       /languages
  *
  * @package WPKnowledgeChat
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'WP_KNOWLEDGE_CHAT_VERSION', '0.1.0' );
+define( 'WP_KNOWLEDGE_CHAT_VERSION', '0.2.0' );
 define( 'WP_KNOWLEDGE_CHAT_FILE', __FILE__ );
 define( 'WP_KNOWLEDGE_CHAT_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WP_KNOWLEDGE_CHAT_URL', plugin_dir_url( __FILE__ ) );

@@ -23,7 +23,7 @@ function jsonResponse(status, body) {
 }
 
 /** Boots the widget in a fresh DOM with a scripted fetch. */
-async function setup({ config = {}, responses = [], storage } = {}) {
+async function setup({ config = {}, responses = [], storage, browserLanguages, savedLanguage } = {}) {
 	const dom = new JSDOM('<!doctype html><html><body><main><a href="/">Site nav</a></main></body></html>', {
 		url: 'https://site.test/',
 		runScripts: 'outside-only',
@@ -40,6 +40,11 @@ async function setup({ config = {}, responses = [], storage } = {}) {
 		return typeof next === 'function' ? next(url, init) : Promise.resolve(next);
 	};
 	if (storage) window.sessionStorage.setItem('wkc-history-v1', storage);
+	if (savedLanguage) window.localStorage.setItem('wkc-lang', savedLanguage);
+	if (browserLanguages) {
+		Object.defineProperty(window.navigator, 'languages', { value: browserLanguages, configurable: true });
+		Object.defineProperty(window.navigator, 'language', { value: browserLanguages[0], configurable: true });
+	}
 	window.wpKnowledgeChatConfig = { ...BASE_CONFIG, ...config };
 	window.eval(SCRIPT);
 	const $ = (sel) => window.document.querySelector(sel);
@@ -355,5 +360,89 @@ describe('session history', () => {
 		assert.equal($$('a[href^="javascript"]').length, 0);
 		assert.equal($$('.wkc-msg').length, 2, 'greeting + one valid restored message');
 		await assert.doesNotReject(setup({ storage: '{not json' }));
+	});
+});
+
+describe('languages', () => {
+	const MULTI = {
+		greeting: undefined,
+		languages: ['en', 'id', 'ko'],
+		switcher: true,
+		detectBrowser: true,
+		greetings: { en: 'Hello!', id: 'Halo!', ko: '안녕하세요!' },
+		suggestions: { en: ['What services do you offer?'], id: ['Layanan apa saja?'], ko: ['어떤 서비스를 제공하나요?'] },
+	};
+
+	it('renders the Korean interface when Korean is the default', async () => {
+		const { $ } = await setup({ config: { ...MULTI, language: 'ko', detectBrowser: false } });
+		assert.equal($('#wkc-root').getAttribute('lang'), 'ko');
+		assert.equal($('#wkc-title').textContent, 'Inpartner AI 어시스턴트');
+		assert.equal($('#wkc-input').getAttribute('placeholder'), '질문을 입력하세요…');
+		assert.equal($('.wkc-launcher').getAttribute('aria-label'), 'Inpartner AI 어시스턴트 열기');
+		assert.equal($('.wkc-msg--bot .wkc-bubble').textContent, '안녕하세요!');
+		assert.equal($('.wkc-chip').textContent, '어떤 서비스를 제공하나요?');
+	});
+
+	it('starts in the browser language when detection is on', async () => {
+		const ko = await setup({ config: MULTI, browserLanguages: ['ko-KR', 'en-US'] });
+		assert.equal(ko.$('#wkc-root').getAttribute('lang'), 'ko');
+		const id = await setup({ config: MULTI, browserLanguages: ['in-ID'] });
+		assert.equal(id.$('#wkc-root').getAttribute('lang'), 'id', 'legacy "in" code means Indonesian');
+		const fr = await setup({ config: { ...MULTI, language: 'id' }, browserLanguages: ['fr-FR', 'de'] });
+		assert.equal(fr.$('#wkc-root').getAttribute('lang'), 'id', 'unsupported browser languages fall back to the default');
+	});
+
+	it('ignores the browser language when detection is off', async () => {
+		const { $ } = await setup({ config: { ...MULTI, detectBrowser: false }, browserLanguages: ['ko-KR'] });
+		assert.equal($('#wkc-root').getAttribute('lang'), 'en');
+	});
+
+	it("prefers the visitor's saved choice over the browser language", async () => {
+		const { $ } = await setup({ config: MULTI, browserLanguages: ['ko-KR'], savedLanguage: 'id' });
+		assert.equal($('#wkc-root').getAttribute('lang'), 'id');
+		const bogus = await setup({ config: MULTI, browserLanguages: ['ko-KR'], savedLanguage: 'xx' });
+		assert.equal(bogus.$('#wkc-root').getAttribute('lang'), 'ko', 'an invalid saved value is ignored');
+	});
+
+	it('switches language in place, keeps the conversation and sends the new language', async () => {
+		const { window, $, $$, calls, flush, type, pressEnter } = await setup({ config: { ...MULTI, detectBrowser: false } });
+		const group = $('.wkc-langs');
+		assert.equal(group.getAttribute('role'), 'group');
+		assert.equal(group.getAttribute('aria-label'), 'Language');
+		assert.deepEqual($$('.wkc-lang').map((b) => b.getAttribute('aria-pressed')), ['true', 'false', 'false']);
+
+		type('What services do you offer?');
+		pressEnter();
+		await flush();
+		assert.equal(calls[0].body.language, 'en');
+
+		$('.wkc-lang[data-lang="ko"]').click();
+		assert.equal($('#wkc-root').getAttribute('lang'), 'ko');
+		assert.deepEqual($$('.wkc-lang').map((b) => b.getAttribute('aria-pressed')), ['false', 'false', 'true']);
+		assert.equal($('.wkc-langs').getAttribute('aria-label'), '언어');
+		assert.equal($('#wkc-title').textContent, 'Inpartner AI 어시스턴트');
+		assert.equal($('.wkc-send-label').textContent, '보내기');
+		assert.match($('.wkc-disclaimer').textContent, /자동 답변/);
+		assert.equal($$('.wkc-msg--bot .wkc-bubble')[0].textContent, '안녕하세요!', 'greeting follows the language');
+		assert.equal($$('.wkc-msg--user').length, 1, 'conversation is kept');
+		assert.equal(window.localStorage.getItem('wkc-lang'), 'ko');
+
+		type('유통 파트너를 찾고 있습니다');
+		pressEnter();
+		await flush();
+		assert.equal(calls[1].body.language, 'ko');
+	});
+
+	it('hides the switcher when disabled or when only one language is available', async () => {
+		const off = await setup({ config: { ...MULTI, switcher: false } });
+		assert.equal(off.$('.wkc-langs'), null);
+		const single = await setup({ config: { ...MULTI, languages: ['en'] } });
+		assert.equal(single.$('.wkc-langs'), null);
+	});
+
+	it('gives each switcher button an accessible name that contains its visible text', async () => {
+		const { $$ } = await setup({ config: MULTI });
+		assert.deepEqual($$('.wkc-lang').map((b) => b.textContent), ['EN English', 'ID Bahasa Indonesia', '한국어']);
+		assert.deepEqual($$('.wkc-lang').map((b) => b.getAttribute('lang')), ['en', 'id', 'ko']);
 	});
 });

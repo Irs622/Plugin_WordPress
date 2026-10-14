@@ -82,6 +82,9 @@ describe('POST /api/chat', () => {
     const res = await postChat(t.url, { message: 'What is the weather on Mars?', language: 'id' });
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), { answer: FALLBACK_MESSAGES.id, sources: [], grounded: false });
+    const ko = await postChat(t.url, { message: '화성의 날씨는 어떤가요?', language: 'ko' }, { clientId: 'ko-fallback' });
+    assert.equal(ko.status, 200);
+    assert.deepEqual(await ko.json(), { answer: FALLBACK_MESSAGES.ko, sources: [], grounded: false });
   });
 
   it('rejects malformed requests with 4xx and no internals', async () => {
@@ -93,6 +96,7 @@ describe('POST /api/chat', () => {
       [{ message: '   ', language: 'en' }, 400, 'invalid_message'],
       [{ message: 'a'.repeat(501), language: 'en' }, 400, 'message_too_long'],
       [{ message: 'hello', language: 'fr' }, 400, 'invalid_language'],
+      [{ message: 'hello', language: 'kr' }, 400, 'invalid_language'],
       [{ message: 'hello', language: ['en'] }, 400, 'invalid_language'],
       [{ message: 'hello', history: 'not an array' }, 400, 'invalid_history'],
       [{ message: 'hello', history: [1, 2, 3, 4, 5] }, 400, 'invalid_history'],

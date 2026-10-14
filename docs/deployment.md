@@ -80,7 +80,7 @@ plugin/wp-knowledge-chat/tests/bin/package-check.sh    # checksum, no dev files,
 Before uploading anywhere, re-check the checksum on the machine that uploads it:
 
 ```bash
-cd dist && shasum -a 256 -c wp-knowledge-chat-0.1.0.zip.sha256
+cd dist && shasum -a 256 -c wp-knowledge-chat-0.2.0.zip.sha256
 ```
 
 ## 3. Install on WordPress staging

@@ -5,6 +5,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 import { after, describe, it } from 'node:test';
 
 const WP = process.env.WP_URL ?? 'http://127.0.0.1:8899';
@@ -12,6 +13,12 @@ const WP_CLI = process.env.WP_CLI;
 const SECRET = process.env.WKC_SHARED_SECRET;
 const GEMINI_KEY = process.env.E2E_GEMINI_KEY;
 const CHAT = `${WP}/wp-json/wp-knowledge-chat/v1/chat`;
+const VERSION = /^ \* Version:\s*(\S+)/m.exec(readFileSync(new URL('../../wp-knowledge-chat.php', import.meta.url), 'utf8'))[1];
+const DEFAULT_GREETINGS = {
+	en: "Hello! How can I help you explore Inpartner's services?",
+	id: 'Halo! Ada yang bisa saya bantu terkait layanan Inpartner?',
+	ko: '안녕하세요! Inpartner의 서비스에 대해 무엇을 도와드릴까요?',
+};
 
 const wpcli = (...args) => execFileSync(WP_CLI, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 // First line only: Elementor's logger may append a "PHP: ... notice" line to WP-CLI stdout.
@@ -48,7 +55,8 @@ async function saveSettings(session, fields, { nonce, referer } = {}) {
 	const html = await page.text();
 	const formNonce = /name=['"]option_page['"][^>]*>.*?name="_wpnonce" value="([a-f0-9]+)"/s.exec(html)?.[1];
 	const body = new URLSearchParams({ option_page: 'wp_knowledge_chat', action: 'update', _wpnonce: nonce ?? formNonce ?? '', _wp_http_referer: referer ?? '/wp-admin/admin.php?page=wp-knowledge-chat' });
-	for (const [k, v] of Object.entries(fields)) if (v !== undefined) body.set(`wp_knowledge_chat_settings[${k}]`, v);
+	// 'greetings[ko]' posts as wp_knowledge_chat_settings[greetings][ko].
+	for (const [k, v] of Object.entries(fields)) if (v !== undefined) body.set(`wp_knowledge_chat_settings${k.split(/[[\]]+/).filter(Boolean).map((p) => `[${p}]`).join('')}`, v);
 	return session.request(`${WP}/wp-admin/options.php`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body });
 }
 
@@ -63,8 +71,8 @@ describe('public site', () => {
 		const res = await fetch(`${WP}/`);
 		assert.equal(res.status, 200);
 		const html = await res.text();
-		assert.match(html, /chat-widget\.js\?ver=0\.1\.0/);
-		assert.match(html, /chat-widget\.css\?ver=0\.1\.0/);
+		assert.ok(html.includes(`chat-widget.js?ver=${VERSION}`), `script version ${VERSION}`);
+		assert.ok(html.includes(`chat-widget.css?ver=${VERSION}`), `style version ${VERSION}`);
 		assert.match(html, /window\.wpKnowledgeChatConfig = \{/);
 		const tag = /<script[^>]*chat-widget\.js[^>]*>/.exec(html)?.[0] ?? '';
 		assert.match(tag, /\bdefer\b/, 'widget script is deferred');
@@ -90,7 +98,10 @@ describe('public site', () => {
 		assert.equal(res.status, 200);
 		assert.equal(body.grounded, false);
 		assert.deepEqual(body.sources, []);
-		assert.match(body.answer, /hubungi tim Inpartner/);
+		assert.match(body.answer, /hubungi tim kami/);
+		const ko = await (await ask('화성의 내일 날씨는 어떤가요?', { language: 'ko' })).json();
+		assert.equal(ko.grounded, false);
+		assert.match(ko.answer, /Inpartner 자문팀/);
 	});
 
 	it('rejects cross-site browser requests and invalid input', async () => {
@@ -133,7 +144,7 @@ describe('admin settings (real options.php flow)', () => {
 		const page = await sub.request(`${WP}/wp-admin/admin.php?page=wp-knowledge-chat`);
 		assert.equal(page.status, 403);
 		const before = getSettings();
-		const post = await saveSettings(sub, { enabled: '1', greeting_message: 'Hacked', language: 'id', contact_url: 'https://inpartnerglobal.com/x' }, { nonce: 'deadbeef00' });
+		const post = await saveSettings(sub, { enabled: '1', 'greetings[id]': 'Hacked', language: 'id', contact_url: 'https://inpartnerglobal.com/x' }, { nonce: 'deadbeef00' });
 		assert.ok([403, 500].includes(post.status), `subscriber options.php status ${post.status}`);
 		assert.deepEqual(getSettings(), before);
 	});
@@ -146,21 +157,37 @@ describe('admin settings (real options.php flow)', () => {
 	it('rejects an administrator request without a valid nonce', async () => {
 		const admin = await new Session().login('admin', 'admin-pass-123');
 		const before = getSettings();
-		const res = await saveSettings(admin, { enabled: '1', greeting_message: 'No nonce', language: 'en', contact_url: 'https://inpartnerglobal.com' }, { nonce: '0000000000' });
+		const res = await saveSettings(admin, { enabled: '1', 'greetings[en]': 'No nonce', language: 'en', contact_url: 'https://inpartnerglobal.com' }, { nonce: '0000000000' });
 		assert.equal(res.status, 403);
 		assert.deepEqual(getSettings(), before);
 	});
 
 	it('persists valid settings and rejects invalid values server-side', async () => {
 		const admin = await new Session().login('admin', 'admin-pass-123');
-		const ok = await saveSettings(admin, { enabled: '1', greeting_message: 'Halo! <b>Ada</b> yang bisa dibantu?', language: 'id', contact_url: 'https://inpartnerglobal.com/contact/' });
+		const ok = await saveSettings(admin, {
+			enabled: '1',
+			'greetings[en]': '',
+			'greetings[id]': 'Halo! <b>Ada</b> yang bisa dibantu?',
+			'greetings[ko]': '반갑습니다! 무엇을 도와드릴까요?',
+			language: 'ko',
+			language_switcher: '1',
+			contact_url: 'https://inpartnerglobal.com/contact/',
+		});
 		assert.equal(ok.status, 302);
 		assert.match(ok.headers.get('location') ?? '', /settings-updated=true/);
-		assert.deepEqual(getSettings(), { enabled: true, greeting_message: 'Halo! Ada yang bisa dibantu?', language: 'id', contact_url: 'https://inpartnerglobal.com/contact/' });
+		const saved = {
+			enabled: true,
+			greetings: { en: DEFAULT_GREETINGS.en, id: 'Halo! Ada yang bisa dibantu?', ko: '반갑습니다! 무엇을 도와드릴까요?' },
+			language: 'ko',
+			contact_url: 'https://inpartnerglobal.com/contact/',
+			language_switcher: true,
+			detect_browser_language: false,
+		};
+		assert.deepEqual(getSettings(), saved);
 
-		const bad = await saveSettings(admin, { enabled: '1', greeting_message: '', language: 'xx', contact_url: 'http://evil.example/' });
+		const bad = await saveSettings(admin, { enabled: '1', 'greetings[ko]': '<script>alert(1)</script>', language: 'xx', language_switcher: '1', contact_url: 'http://evil.example/' });
 		assert.equal(bad.status, 302);
-		assert.deepEqual(getSettings(), { enabled: true, greeting_message: 'Halo! Ada yang bisa dibantu?', language: 'id', contact_url: 'https://inpartnerglobal.com/contact/' });
+		assert.deepEqual(getSettings(), saved);
 		const after = await (await admin.request(`${WP}/wp-admin/admin.php?page=wp-knowledge-chat&settings-updated=true`)).text();
 		assert.match(after, /Greeting message is required/);
 		assert.match(after, /Contact URL must be an absolute https/);
@@ -168,17 +195,31 @@ describe('admin settings (real options.php flow)', () => {
 		assert.ok(!after.includes(SECRET));
 
 		const html = await (await fetch(`${WP}/`)).text();
-		assert.match(html, /"language":"id"/);
+		assert.match(html, /"language":"ko"/);
+		assert.match(html, /"languages":\["en","id","ko"\]/);
+		assert.match(html, /"switcher":true,"detectBrowser":false/);
+		assert.ok(html.includes('반갑습니다! 무엇을 도와드릴까요?'), 'Korean greeting is embedded unescaped');
 	});
 
 	it('disabling the chatbot removes the widget and closes the endpoint; re-enabling restores it', async () => {
 		const admin = await new Session().login('admin', 'admin-pass-123');
-		await saveSettings(admin, { greeting_message: 'Hello!', language: 'en', contact_url: 'https://inpartnerglobal.com/contact/' });
+		await saveSettings(admin, { language: 'en', contact_url: 'https://inpartnerglobal.com/contact/' });
 		assert.equal(getSettings().enabled, false);
 		assert.ok(!(await (await fetch(`${WP}/`)).text()).includes('chat-widget.js'));
 		assert.equal((await ask('What services does Inpartner offer?')).status, 503);
 
-		await saveSettings(admin, { enabled: '1', greeting_message: "Hello! How can I help you explore Inpartner's services?", language: 'en', contact_url: 'https://inpartnerglobal.com/contact/' });
+		// Restore the defaults the browser checks expect.
+		await saveSettings(admin, {
+			enabled: '1',
+			'greetings[en]': '',
+			'greetings[id]': '',
+			'greetings[ko]': '',
+			language: 'en',
+			language_switcher: '1',
+			detect_browser_language: '1',
+			contact_url: 'https://inpartnerglobal.com/contact/',
+		});
+		assert.deepEqual(getSettings().greetings, DEFAULT_GREETINGS);
 		assert.equal(getSettings().enabled, true);
 		assert.ok((await (await fetch(`${WP}/`)).text()).includes('chat-widget.js'));
 	});

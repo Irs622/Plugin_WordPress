@@ -41,6 +41,18 @@ describe('ChatService grounding', () => {
     assert.equal(llm.calls.length, 0);
   });
 
+  it('returns the Korean fallback and asks the model to answer in Korean', async () => {
+    const none = new FakeLlm();
+    assert.deepEqual(await service(none).answer('파리에서 자전거를 파나요?', 'ko'), { answer: FALLBACK_MESSAGES.ko, sources: [], grounded: false, outcome: 'no_evidence' });
+    assert.equal(none.calls.length, 0);
+
+    const llm = new FakeLlm(() => JSON.stringify({ answer: 'Inpartner는 유통사 발굴을 지원합니다.', source_ids: ['S1'], grounded: true }));
+    const result = await service(llm).answer('유통사와 리셀러를 찾아 주실 수 있나요?', 'ko');
+    assert.equal(result.grounded, true);
+    assert.match(llm.calls[0]!.systemInstruction, /Write "answer" in Korean \(한국어\)/);
+    assert.match(llm.calls[0]!.systemInstruction, /서비스 문의/);
+  });
+
   it('falls back on malformed LLM output', async () => {
     for (const raw of ['not json', '{"answer": 5}', '[]', '{"answer":"x","source_ids":"S1","grounded":true}', '{"answer":"","source_ids":[],"grounded":true}']) {
       const result = await service(new FakeLlm(() => raw)).answer(QUESTION, 'en');
