@@ -74,8 +74,8 @@ export function createApp({ config, store, llm, logger, now = () => Date.now() }
     };
 
     run().catch((err: unknown) => {
+      if (!req.complete) req.resume();
       if (err instanceof HttpError) {
-        if (!req.complete) req.resume();
         const details = (err as HttpError & { details?: unknown }).details;
         if (details) {
           sendJson(res, err.status, { error: { code: err.code, message: err.message, details } }, err.headers);

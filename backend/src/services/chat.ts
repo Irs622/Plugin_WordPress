@@ -107,7 +107,7 @@ export function buildSystemInstruction(language: Language): string {
 
 function sanitizeForPrompt(text: string): string {
   // Prevent content from closing the delimiters used below.
-  return text.replace(/<\/?(source|question|sources|conversation_context)\b[^>]*>/gi, '[removed]');
+  return text.replace(/<\/?(source|sources|question|system|instructions?|conversation_context)\b[^>]*>/gi, '[removed]');
 }
 
 export function buildUserContent(question: string, evidence: RetrievedChunk[], history?: ChatHistoryTurn[]): string {
@@ -157,7 +157,7 @@ export function looksUnsafe(answer: string, secrets: readonly string[]): boolean
 
 function cleanAnswer(answer: string): string {
   // eslint-disable-next-line no-control-regex
-  let text = answer.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  let text = answer.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\uFEFF]/g, '').replace(/\n{3,}/g, '\n\n').trim();
   if (text.length > MAX_ANSWER_CHARS) text = text.slice(0, MAX_ANSWER_CHARS - 1).trimEnd() + '…';
   return text;
 }

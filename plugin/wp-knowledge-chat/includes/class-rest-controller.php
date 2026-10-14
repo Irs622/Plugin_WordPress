@@ -76,7 +76,7 @@ final class Rest_Controller {
 		if ( ! is_string( $message ) ) {
 			return $this->error( 'wkc_invalid_message', 'invalid', $language, 400 );
 		}
-		$message = trim( preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', wp_check_invalid_utf8( $message ) ) ?? '' );
+		$message = trim( preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{200B}-\x{200D}\x{FEFF}]/u', '', wp_check_invalid_utf8( $message ) ) ?? '' );
 		if ( '' === $message ) {
 			return $this->error( 'wkc_invalid_message', 'invalid', $language, 400 );
 		}
@@ -91,7 +91,7 @@ final class Rest_Controller {
 				if ( is_array( $item ) && isset( $item['role'], $item['text'] ) && is_string( $item['role'] ) && is_string( $item['text'] ) ) {
 					$role = $item['role'];
 					if ( in_array( $role, array( 'user', 'model' ), true ) ) {
-						$clean_text = trim( preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', wp_check_invalid_utf8( $item['text'] ) ) ?? '' );
+						$clean_text = trim( preg_replace( '/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\x{200B}-\x{200D}\x{FEFF}]/u', '', wp_check_invalid_utf8( $item['text'] ) ) ?? '' );
 						$max_chars  = 'model' === $role ? self::MAX_ANSWER_CHARS : self::MAX_MESSAGE_CHARS;
 						if ( '' !== $clean_text && mb_strlen( $clean_text ) <= $max_chars ) {
 							$history[] = array(
@@ -223,7 +223,12 @@ final class Rest_Controller {
 
 	private function client_ip(): string {
 		$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
-		$ip     = $remote;
+		if ( preg_match( '/^(\d{1,3}(?:\.\d{1,3}){3}):\d+$/', $remote, $matches ) ) {
+			$remote = $matches[1];
+		} elseif ( preg_match( '/^\[([a-f0-9:]+)\]:\d+$/i', $remote, $matches ) ) {
+			$remote = $matches[1];
+		}
+		$ip = $remote;
 		// X-Forwarded-For is client-controlled. It is read only when the direct
 		// peer is a proxy the site owner listed in WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES.
 		if ( '' !== $remote && self::is_trusted_proxy( $remote ) && isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {

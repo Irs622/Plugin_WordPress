@@ -90,6 +90,15 @@ describe('chunkDocument', () => {
     }
     assert.equal(chunks[0]!.id, 'page-1-home#1');
   });
+
+  it('safely splits long unbroken lines without dropping content', () => {
+    const text = 'START_' + 'a'.repeat(2000) + '_END';
+    const doc = validateDocument({ ...valid, text }, HOSTS);
+    const chunks = chunkDocument(doc, 300);
+    assert.ok(chunks.length >= 7);
+    const combined = chunks.map((c) => c.text).join('');
+    assert.equal(combined, text);
+  });
 });
 
 describe('Bm25Retriever', () => {

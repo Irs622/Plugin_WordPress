@@ -38,6 +38,17 @@ describe('SignatureVerifier', () => {
     assert.equal(verifier.verify(ts, nonce, 'other-client', sig, body), 'invalid');
     assert.equal(verifier.verify(ts, nonce, 'abc', computeSignature('w'.repeat(40), ts, nonce, 'abc', body), body), 'invalid');
   });
+
+  it('bounds memory under signature flood', () => {
+    const verifier = new SignatureVerifier(secret, 300, () => now, 100);
+    // Submit 150 unique signatures
+    for (let i = 0; i < 150; i++) {
+      const n = i.toString(16).padStart(32, '0');
+      const sig = computeSignature(secret, ts, n, 'abc', body);
+      verifier.verify(ts, n, 'abc', sig, body);
+    }
+    assert.ok((verifier as unknown as { seen: Map<string, number> }).seen.size <= 100);
+  });
 });
 
 describe('verifyBearerToken', () => {
@@ -48,6 +59,9 @@ describe('verifyBearerToken', () => {
     assert.equal(verifyBearerToken(`Bearer ${token}x`, token), false);
     assert.equal(verifyBearerToken(`Basic ${token}`, token), false);
     assert.equal(verifyBearerToken('', token), false);
+    assert.equal(verifyBearerToken(undefined, token), false);
+    assert.equal(verifyBearerToken(null, token), false);
+    assert.equal(verifyBearerToken(`Bearer ${token}`, ''), false);
   });
 });
 

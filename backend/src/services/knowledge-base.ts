@@ -74,7 +74,7 @@ export function canonicalizeSourceUrl(raw: unknown, allowedHosts: readonly strin
 
 function controlCharsStripped(value: string): string {
   // eslint-disable-next-line no-control-regex
-  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+  return value.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\uFEFF]/g, '');
 }
 
 export function validateDocument(input: unknown, allowedHosts: readonly string[]): KnowledgeDocument {
@@ -132,6 +132,24 @@ export function documentFingerprint(doc: KnowledgeDocument): string {
     .digest('hex');
 }
 
+function splitLongLine(line: string, maxLen: number): string[] {
+  const pieces: string[] = [];
+  let remaining = line.trim();
+  while (remaining.length > maxLen) {
+    let breakIdx = remaining.lastIndexOf(' ', maxLen);
+    if (breakIdx <= 0) {
+      breakIdx = maxLen;
+    }
+    const part = remaining.slice(0, breakIdx).trim();
+    if (part) pieces.push(part);
+    remaining = remaining.slice(breakIdx).trim();
+  }
+  if (remaining.length > 0) {
+    pieces.push(remaining);
+  }
+  return pieces;
+}
+
 /** Splits a document into line-aligned chunks, each prefixed with the document title for context. */
 export function chunkDocument(doc: KnowledgeDocument, targetChars = LIMITS.chunkTargetChars): Chunk[] {
   const lines = doc.text.split(/\n+/).map((l) => l.trim()).filter(Boolean);
@@ -153,8 +171,8 @@ export function chunkDocument(doc: KnowledgeDocument, targetChars = LIMITS.chunk
   };
 
   for (const line of lines) {
-    // Hard-wrap pathological single lines so no chunk grows unbounded.
-    const pieces = line.length > targetChars * 2 ? line.match(new RegExp(`.{1,${targetChars}}(\\s|$)`, 'g')) ?? [line] : [line];
+    // Hard-wrap pathological single lines so no chunk grows unbounded and all content is preserved.
+    const pieces = line.length > targetChars * 2 ? splitLongLine(line, targetChars) : [line];
     for (const piece of pieces) {
       if (size + piece.length > targetChars && size > 0) flush();
       current.push(piece.trim());

@@ -34,13 +34,15 @@ export class SignatureVerifier {
     private readonly secret: string,
     private readonly maxSkewSeconds: number,
     private readonly now: () => number = () => Date.now(),
+    private readonly maxEntries = 50000,
   ) {}
 
   verify(timestamp: string, nonce: string, clientId: string, signature: string, rawBody: string): SignatureFailure | null {
+    if (typeof timestamp !== 'string' || typeof nonce !== 'string' || typeof signature !== 'string') return 'missing';
     if (!timestamp || !nonce || !signature) return 'missing';
     if (!/^[a-f0-9]{16,64}$/.test(nonce)) return 'malformed';
     if (!/^\d{9,11}$/.test(timestamp) || !/^[a-f0-9]{64}$/.test(signature)) return 'malformed';
-    if (!/^[a-zA-Z0-9_-]{0,128}$/.test(clientId)) return 'malformed';
+    if (typeof clientId !== 'string' || !/^[a-zA-Z0-9_-]{0,128}$/.test(clientId)) return 'malformed';
 
     const nowSeconds = Math.floor(this.now() / 1000);
     if (Math.abs(nowSeconds - Number(timestamp)) > this.maxSkewSeconds) return 'expired';
@@ -55,6 +57,11 @@ export class SignatureVerifier {
   }
 
   private prune(nowSeconds: number): void {
+    // Under a flood of unique signatures within the skew window, protect memory.
+    if (this.seen.size >= this.maxEntries) {
+      this.seen.clear();
+      return;
+    }
     if (this.seen.size < 1000) return;
     for (const [sig, at] of this.seen) {
       if (nowSeconds - at > this.maxSkewSeconds) this.seen.delete(sig);
@@ -62,7 +69,10 @@ export class SignatureVerifier {
   }
 }
 
-export function verifyBearerToken(authorizationHeader: string, expectedToken: string): boolean {
+export function verifyBearerToken(authorizationHeader: string | undefined | null, expectedToken: string): boolean {
+  if (typeof authorizationHeader !== 'string' || typeof expectedToken !== 'string' || !expectedToken) {
+    return false;
+  }
   const match = /^Bearer\s+(\S+)$/i.exec(authorizationHeader.trim());
   if (!match?.[1]) return false;
   return safeEqual(match[1], expectedToken);

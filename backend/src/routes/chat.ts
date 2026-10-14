@@ -27,7 +27,7 @@ export function validateChatRequest(body: unknown, maxMessageChars: number): { m
     throw new HttpError(400, 'invalid_message', 'message must be a string.');
   }
   // eslint-disable-next-line no-control-regex
-  const message = body.message.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+  const message = body.message.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\uFEFF]/g, '').trim();
   if (message.length === 0) {
     throw new HttpError(400, 'invalid_message', 'message must not be empty.');
   }
@@ -53,7 +53,7 @@ export function validateChatRequest(body: unknown, maxMessageChars: number): { m
         throw new HttpError(400, 'invalid_history', 'Each history item must have role ("user" | "model") and text.');
       }
       // eslint-disable-next-line no-control-regex
-      const cleanText = item.text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
+      const cleanText = item.text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200D\uFEFF]/g, '').trim();
       const limit = item.role === 'model' ? 1500 : maxMessageChars;
       if ([...cleanText].length > limit) {
         throw new HttpError(400, 'invalid_history', `History text exceeds maximum allowed length.`);

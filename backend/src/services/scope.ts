@@ -42,6 +42,8 @@ const SCOPE_RULES: { kind: ScopeViolation; patterns: RegExp[] }[] = [
       /\b(unpublished|draft|private|hidden)\s+(pages?|posts?|content|documents?)\b/i,
       /\b(abaikan|lupakan|langgar)\b[^.?!]{0,40}\b(instruksi|aturan|perintah)\b/i,
       /\b(tampilkan|tunjukkan|sebutkan)\b[^.?!]{0,40}\b(instruksi|prompt|kunci|rahasia|konfigurasi)\b/i,
+      /\bkamu sekarang\b|\bberperan(lah)? sebagai\b|\bberpura-pura(lah)?\b/i,
+      /\bulang(i)?\b[^.?!]{0,30}\b(kata|kalimat|semua|teks)\b[^.?!]{0,20}\b(di atas|sebelumnya)\b/i,
     ],
   },
   {

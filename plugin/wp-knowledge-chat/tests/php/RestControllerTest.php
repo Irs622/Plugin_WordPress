@@ -319,4 +319,25 @@ final class RestControllerTest extends TestCase {
 		$this->assertStringContainsString( 'Asisten sedang tidak tersedia', $this->chat( array( 'message' => 'halo', 'language' => 'id' ) )->get_data()['message'] );
 		$this->assertStringContainsString( 'The assistant is unavailable', $this->chat( array( 'message' => 'hello', 'language' => 'en' ) )->get_data()['message'] );
 	}
+
+	public function test_zero_width_characters_are_stripped_and_empty_message_rejected(): void {
+		// Only zero-width characters (e.g. U+200B) should be treated as empty.
+		$response = $this->chat( array( 'message' => "\xE2\x80\x8B\xE2\x80\x8C\xEF\xBB\xBF" ) );
+		$this->assertSame( 400, $response->get_status() );
+
+		// Text mixed with zero-width characters should have them stripped.
+		$this->backend( array( 200, self::GOOD ) );
+		$response = $this->chat( array( 'message' => "Hello\xE2\x80\x8B World" ) );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertSame( '{"message":"Hello World","language":"en"}', $this->calls[0]['args']['body'] );
+	}
+
+	public function test_client_ip_handles_remote_addr_with_port(): void {
+		$_SERVER['REMOTE_ADDR'] = '203.0.113.99:54321';
+		$this->backend( array( 200, self::GOOD ) );
+		$response = $this->chat( array( 'message' => 'What services do you offer?' ) );
+		$this->assertSame( 200, $response->get_status() );
+		$this->assertNotEmpty( $this->calls[0]['args']['headers']['X-WKC-Client'] );
+	}
 }
+
