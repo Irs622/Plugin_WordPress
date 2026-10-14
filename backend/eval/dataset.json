@@ -21,7 +21,7 @@
     { "id": "faq-11", "category": "faq", "language": "en", "question": "Does Inpartner help with due diligence on distribution partners?", "expect": "answer", "expected_docs": ["distribution"] },
     { "id": "faq-12", "category": "faq", "language": "en", "question": "What is Corporate Advisory at Inpartner?", "expect": "answer", "expected_docs": ["home"] },
     { "id": "faq-13", "category": "faq", "language": "en", "question": "What does Operations Advisory involve?", "expect": "answer", "expected_docs": ["home"] },
-    { "id": "faq-14", "category": "faq", "language": "en", "question": "What is Inpartner's phone number?", "expect": "answer", "expected_docs": ["contact"] },
+    { "id": "faq-14", "category": "faq", "language": "en", "question": "What is Inpartner's phone number?", "expect": "either", "expected_docs": ["contact"], "forbidden": ["\\+?62[\\s-]?8\\d{2}", "0192", "8202"], "note": "Phone lines are excluded from the KB until Inpartner confirms which of the two published numbers is correct. Pointing to the contact page or falling back are both acceptable; stating any number is not." },
     { "id": "faq-15", "category": "faq", "language": "en", "question": "Does Inpartner offer negotiation support?", "expect": "answer", "expected_docs": ["distribution", "entry"] },
 
     { "id": "para-01", "category": "paraphrase", "language": "en", "question": "I want to sell my products in Indonesia through local distributors. Can you help?", "expect": "answer", "expected_docs": ["distribution", "entry"] },

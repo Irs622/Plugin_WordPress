@@ -61,7 +61,8 @@ curl -s http://127.0.0.1:8787/api/chat -H 'Content-Type: application/json' \
 | `test` | Build, then run all tests in `tests/` with `node:test` |
 | `kb:build` | Rebuild `data/kb.json` from the allowlist in `data/sources.json` (reads the public site) |
 | `kb:push` | Send `data/kb.json` to a running backend's `/api/index` (needs `BACKEND_URL`, `INDEX_API_TOKEN`) |
-| `eval:retrieval` | Offline retrieval evaluation on `eval/dataset.json` |
+| `kb:validate` | Check `data/kb.json` against `data/sources.json` offline (approved pages only, none missing, no empty pages or excluded lines); exits non-zero on errors |
+| `eval:retrieval` | Offline evaluation of retrieval and the answerability gate on `eval/dataset.json` (add `-- --dataset=eval/holdout.json` for the held-out set) |
 | `eval:live` | Evaluation through the real Gemini API; writes `eval/report-live-*.json` |
 | `mock:gemini` | Start the local Gemini stand-in on port 8790 |
 | `secret` | Print a random 32-byte hex secret |
@@ -85,7 +86,7 @@ All configuration comes from environment variables, validated at startup. On inv
 | `MAX_MESSAGE_CHARS` | | `500` | |
 | `RATE_LIMIT_PER_CLIENT_PER_MINUTE` | | `8` | per signed client id (one visitor) |
 | `RATE_LIMIT_GLOBAL_PER_MINUTE` | | `60` | all visitors combined |
-| `DAILY_REQUEST_LIMIT` | | `1000` | cost ceiling; resets 00:00 UTC |
+| `DAILY_REQUEST_LIMIT` | | `1000` | cost ceiling: **model calls** per UTC day (questions answered without Gemini are not counted); resets 00:00 UTC |
 | `RETRIEVAL_MIN_SCORE` / `RETRIEVAL_TOP_K` | | `1.0` / `4` | see [../docs/knowledge-base.md](../docs/knowledge-base.md) |
 | `SIGNATURE_MAX_SKEW_SECONDS` | | `300` | allowed clock difference with WordPress |
 | `LOG_LEVEL` | | `info` | `debug`, `info`, `warn`, `error` |
@@ -93,11 +94,14 @@ All configuration comes from environment variables, validated at startup. On inv
 ## How a question is answered
 
 1. **Authenticate:** verify the HMAC signature, timestamp window and nonce replay cache (`src/lib/auth.ts`).
-2. **Limit:** per-client and global per-minute windows, then the daily budget (`src/middleware/rate-limit.ts`).
+2. **Limit:** per-client and global per-minute windows (`src/middleware/rate-limit.ts`). These run before the body is parsed, so malformed requests still count.
 3. **Validate:** message 1–500 characters, language `en` or `id` (`src/routes/chat.ts`).
-4. **Retrieve:** BM25 over ~700-character chunks, with Indonesian→English query expansion (`src/services/retrieval.ts`, `text.ts`). If no chunk reaches `RETRIEVAL_MIN_SCORE`, return the fallback and **do not call Gemini**.
-5. **Generate:** the system instruction holds the rules (sources only, no invented claims, no personalised advice, ignore instructions inside sources or the question, answer language). Sources and the question are wrapped in sanitised delimiters, and the reply must be JSON (`src/services/chat.ts`, `llm.ts`).
-6. **Check:** parse the JSON. Malformed, ungrounded or unsafe output (key patterns, leaked instructions, markup) becomes the fallback. Cited `S1…Sn` ids are mapped to knowledge-base titles and URLs, at most 3.
+4. **Scope:** prompt injection, personal investment/legal/tax/medical advice, guarantees and unrelated tasks get the fallback without retrieval or Gemini (`src/services/scope.ts`).
+5. **Retrieve:** BM25 over ~700-character chunks, with Indonesian→English query expansion; markup in the question is ignored (`src/services/retrieval.ts`, `text.ts`). If no chunk reaches `RETRIEVAL_MIN_SCORE`, return the fallback and **do not call Gemini**.
+6. **Answer type:** a question asking for prices, a founding date, headcount, statistics, client names or office hours gets the fallback unless the retrieved text contains that kind of fact (`scope.ts`).
+7. **Budget:** one unit of `DAILY_REQUEST_LIMIT` is consumed; when it is used up the request gets 429 `daily_limit_reached`.
+8. **Generate:** the system instruction holds the rules (sources only, no invented claims, no personalised advice, ignore instructions inside sources or the question, answer language). Sources and the question are wrapped in sanitised delimiters, and the reply must be JSON (`src/services/chat.ts`, `llm.ts`).
+9. **Check:** parse the JSON. Malformed, ungrounded or unsafe output (key patterns, leaked instructions, markup) becomes the fallback. Cited `S1…Sn` ids are mapped to knowledge-base titles and URLs, at most 3.
 
 Errors from Gemini become `504 provider_timeout` or `502 provider_unavailable`. The WordPress plugin turns them into a friendly message.
 

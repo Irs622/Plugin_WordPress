@@ -126,7 +126,7 @@ final class Admin_Page {
 					esc_html(
 						sprintf(
 							/* translators: %s: approved hostnames. */
-							__( 'Absolute https:// URL on an approved domain: %s. The official contact page is https://inpartnerglobal.com/contact/.', 'wp-knowledge-chat' ),
+							__( 'Absolute https:// URL on an approved domain: %s.', 'wp-knowledge-chat' ),
 							implode( ', ', Settings::approved_contact_hosts() )
 						)
 					)
@@ -174,10 +174,16 @@ final class Admin_Page {
 			<?php if ( is_array( $health ) ) : ?>
 				<p role="status">
 					<?php
-					echo $health['ok']
-						? esc_html__( 'Connection test: backend is reachable and its knowledge base is ready.', 'wp-knowledge-chat' )
+					if ( $health['ok'] ) {
+						esc_html_e( 'Connection test: backend is reachable, the shared secret is accepted and the knowledge base is ready.', 'wp-knowledge-chat' );
+					} elseif ( 401 === (int) $health['status'] ) {
+						esc_html_e( 'Connection test failed: the backend rejected the shared secret. Check that WP_KNOWLEDGE_CHAT_SHARED_SECRET matches CHAT_SHARED_SECRET and that the server clock is correct.', 'wp-knowledge-chat' );
+					} elseif ( 503 === (int) $health['status'] ) {
+						esc_html_e( 'Connection test failed: the backend is running but its knowledge base is empty.', 'wp-knowledge-chat' );
+					} else {
 						/* translators: %d: HTTP status code, 0 when unreachable. */
-						: esc_html( sprintf( __( 'Connection test failed (HTTP status %d). Check the backend URL and that the service is running.', 'wp-knowledge-chat' ), (int) $health['status'] ) );
+						echo esc_html( sprintf( __( 'Connection test failed (HTTP status %d). Check the backend URL and that the service is running.', 'wp-knowledge-chat' ), (int) $health['status'] ) );
+					}
 					?>
 				</p>
 			<?php endif; ?>

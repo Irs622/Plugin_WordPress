@@ -16,11 +16,14 @@
 | Requirement | Implementation | Evidence |
 |---|---|---|
 | Capability checks | `manage_options` on menu, page render (`wp_die` 403), admin-post handler; options.php enforces group capability | PHPUnit `AdminAndWidgetTest`; E2E: subscriber and editor get 403, settings unchanged |
-| Nonce validation | Settings API nonce on options.php; `check_admin_referer` on *Test connection* | E2E: admin with bad nonce → 403; PHPUnit: missing/wrong/other-action nonce → 403 |
+| Nonce validation | Settings API nonce on options.php; `check_admin_referer` on *Test connection* (which also signs its health request, so a secret mismatch is visible) | E2E: admin with bad nonce → 403; PHPUnit: missing/wrong/other-action nonce → 403 |
 | Input validation | WP route + backend validate independently (type, length ≤500, enum) | PHPUnit `RestControllerTest`, backend `api.test.ts` |
 | Output escaping | Admin: `esc_html`/`esc_attr`/`esc_textarea`/`esc_url`. Inline config: `wp_json_encode` with `JSON_HEX_*`. Widget: `textContent` only, no `innerHTML` | PHPUnit escaping tests; jsdom tests (XSS payloads stay text); static grep test for `innerHTML` |
 | SQL safety | No custom tables; only `uninstall.php` uses `$wpdb->prepare()` with `esc_like` | phpcs `WordPress.DB.PreparedSQL*`: 0 findings |
-| Rate limiting | WP 6/min/IP (sliding window). Backend 8/min/client, 60/min global, 1000/day (all configurable) | PHPUnit, backend tests, E2E 7th request → 429 |
+| Rate limiting | WP 6/min/IP (sliding window, `Retry-After`). Backend 8/min/client, 60/min global (before body parsing, so malformed input counts), 1000 **model calls**/day (all configurable) | PHPUnit, backend tests, E2E 7th request → 429; budget not consumed by no-model fallbacks |
+| Client IP behind proxies | `REMOTE_ADDR` by default; `X-Forwarded-For` read only when `REMOTE_ADDR` is in `WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES` (IPs/CIDRs), right-most untrusted hop | PHPUnit: spoofed header ignored from untrusted peer; per-visitor buckets behind a trusted proxy; CIDR v4/v6 |
+| Answerability | Scope policy (injection, personal investment/legal/tax/medical advice, guarantees, unrelated) and answer-type evidence check before the model; numbers/URLs/e-mails/phones in answers must appear in the evidence | `scope-claims.test.ts`, offline evaluation on design and held-out sets |
+| Provider robustness | Deadline covers the response body; 256 KiB response cap; invalid-key 400 → `auth`; safety block → fallback | `chat-llm.test.ts` (stalled body, oversize, `API_KEY_INVALID`) |
 | Request-size limits | WP 500 chars; backend chat 8 KiB, index 2 MiB, enforced while streaming | backend tests (413) |
 | Timeouts | Browser 30 s, WP→backend 20 s, backend→Gemini 12 s total (1 retry), server request/header timeouts | backend timeout tests; E2E slow provider → friendly 503 |
 | Secret management | Gemini key and tokens only in backend env; WP secret in `wp-config.php`; nothing in options or frontend | E2E: page HTML, settings page and logs checked for secrets; PHPUnit: option and inline config contain none |
@@ -45,7 +48,8 @@ Static analysis: `phpcs` with `WordPress.Security`, `WordPress.DB.PreparedSQL*` 
 
 ## Residual risks / not covered
 
-- Rate limits in the backend are per-process memory. Several instances or restarts reset counters. WordPress transients without a persistent object cache add database writes per chat request.
-- The WP per-IP limit uses `REMOTE_ADDR`. Behind a CDN or proxy, every visitor may share an IP until `wp_knowledge_chat_client_ip` is filtered to read a header set **only** by the trusted proxy.
-- LLM behaviour can only be reduced, not eliminated, by prompt rules. Unanswerable questions that share keywords with the site do reach the model (11 of 25 in the offline evaluation) and depend on it declining. A live evaluation with the real model has **not** been run yet.
-- No WAF/bot protection. Sustained abuse is bounded by the daily budget, which also blocks legitimate users once reached.
+- Rate limits and the replay cache in the backend are per-process memory. Several instances or restarts reset counters, and a replay could succeed against a *different* instance inside the 5-minute window. Run a single instance (see [deployment.md](deployment.md#scaling-decision)). WordPress transients without a persistent object cache add database writes per chat request, and concurrent requests can exceed the per-IP limit slightly (transients are not atomic); the backend limits still apply.
+- The `Origin` check is not authentication: non-browser clients can omit or forge it. It only stops other websites from using visitors' browsers. Anonymous abuse is bounded by the rate limits and the daily model-call budget.
+- Behind a CDN or proxy, every visitor shares the proxy's IP (one rate-limit bucket for the whole site) until `WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES` lists the proxy ranges. Listing too broad a range lets visitors forge `X-Forwarded-For`.
+- LLM behaviour can only be reduced, not eliminated, by prompt rules and checks. The deterministic gate stops all 25 unanswerable design-set questions and 16 of 22 held-out ones before the model; the other 6 held-out questions depend on the model declining, backed by the claim check, which catches invented numbers and contact details but **not** invented prose (for example "Yes, we have a London office"). The gate's patterns are English/Indonesian keyword rules and can be evaded by rephrasing. A live evaluation with the real model has **not** been run (no API key).
+- No WAF/bot protection. Sustained abuse is bounded by the daily budget, which also blocks legitimate users once reached (it now counts model calls only, so questions answered by the fallback do not use it up).

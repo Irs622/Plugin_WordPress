@@ -1,7 +1,9 @@
 import type { Logger } from '../lib/logger.js';
+import type { LimitResult } from '../middleware/rate-limit.js';
 import type { KnowledgeBaseStore } from './knowledge-base.js';
-import type { LlmClient } from './llm.js';
+import { LlmError, type LlmClient } from './llm.js';
 import type { Bm25Retriever, RetrievedChunk } from './retrieval.js';
+import { missingAnswerType, scopeViolation, unsupportedClaims } from './scope.js';
 
 /**
  * Chat orchestration: retrieve evidence, ask the model to answer only from
@@ -23,7 +25,24 @@ export interface ChatAnswer {
   grounded: boolean;
 }
 
-export type ChatOutcome = 'answered' | 'no_evidence' | 'model_declined' | 'invalid_model_output' | 'unsafe_model_output';
+export type ChatOutcome =
+  | 'answered'
+  | 'out_of_scope'
+  | 'no_evidence'
+  | 'missing_answer_type'
+  | 'model_declined'
+  | 'provider_blocked'
+  | 'invalid_model_output'
+  | 'unsafe_model_output'
+  | 'unsupported_claims';
+
+/** Thrown when the daily model-call budget is used up. */
+export class BudgetExceededError extends Error {
+  constructor(public readonly retryAfterSeconds: number) {
+    super('Daily model-call budget exhausted');
+    this.name = 'BudgetExceededError';
+  }
+}
 
 export const FALLBACK_MESSAGES: Record<Language, string> = {
   en: "I couldn't find enough information about that in Inpartner's published website content, so I'd rather not guess. For specific questions, please contact the Inpartner team directly.",
@@ -49,6 +68,7 @@ export function buildSystemInstruction(language: Language): string {
     '6. When grounded, list in "source_ids" only the ids of the sources you actually used (for example ["S1"]).',
     `7. Write "answer" in ${LANGUAGE_NAMES[language]}. Keep service names, company names and proper nouns exactly as written in the sources. Do not add claims while translating.`,
     '8. Keep "answer" under 120 words, plain text without markdown, links or HTML. Do not include URLs; links are shown separately.',
+    '   Only write numbers, e-mail addresses or phone numbers that appear verbatim in the SOURCES.',
     '9. If something is general context rather than a fact from the sources, say so explicitly (for example "In general, ...").',
     '',
     'Respond with JSON only: {"answer": string, "source_ids": string[], "grounded": boolean}.',
@@ -113,22 +133,51 @@ export interface ChatServiceOptions {
   topK: number;
   minScore: number;
   secrets: readonly string[];
+  /** Consumed once per model call (not per request), so questions answered without the model cost no budget. */
+  budget?: { consume(): LimitResult };
 }
+
+export type ChatResult = ChatAnswer & { outcome: ChatOutcome; reason?: string };
 
 export class ChatService {
   constructor(private readonly options: ChatServiceOptions) {}
 
-  async answer(message: string, language: Language): Promise<ChatAnswer & { outcome: ChatOutcome }> {
-    const fallback = (outcome: ChatOutcome) => ({ answer: FALLBACK_MESSAGES[language], sources: [], grounded: false, outcome });
+  async answer(message: string, language: Language): Promise<ChatResult> {
+    const fallback = (outcome: ChatOutcome, reason?: string): ChatResult => ({
+      answer: FALLBACK_MESSAGES[language],
+      sources: [],
+      grounded: false,
+      outcome,
+      ...(reason ? { reason } : {}),
+    });
+
+    const violation = scopeViolation(message);
+    if (violation) return fallback('out_of_scope', violation);
 
     const evidence = this.options.retriever.search(message, this.options.topK, this.options.minScore);
     if (evidence.length === 0) return fallback('no_evidence');
 
-    // LlmError propagates to the route, which maps it to a 502/504 response.
-    const raw = await this.options.llm.generate({
-      systemInstruction: buildSystemInstruction(language),
-      userContent: buildUserContent(message, evidence),
-    });
+    const evidenceText = evidence.map((e) => `${e.chunk.title}\n${e.chunk.text}`).join('\n');
+    const missing = missingAnswerType(message, evidenceText);
+    if (missing) return fallback('missing_answer_type', missing);
+
+    if (this.options.budget) {
+      const budget = this.options.budget.consume();
+      if (!budget.allowed) throw new BudgetExceededError(budget.retryAfterSeconds);
+    }
+
+    let raw: string;
+    try {
+      raw = await this.options.llm.generate({
+        systemInstruction: buildSystemInstruction(language),
+        userContent: buildUserContent(message, evidence),
+      });
+    } catch (err) {
+      // A safety block is about this question, not an outage: answer with the fallback.
+      if (err instanceof LlmError && err.kind === 'blocked') return fallback('provider_blocked');
+      // Other LlmErrors propagate to the route, which maps them to 502/504.
+      throw err;
+    }
 
     const output = parseModelOutput(raw);
     if (!output) {
@@ -155,6 +204,12 @@ export class ChatService {
       if (sources.length >= MAX_SOURCES) break;
     }
     if (sources.length === 0) return fallback('invalid_model_output');
+
+    const claims = unsupportedClaims(output.answer, evidenceText);
+    if (claims.length > 0) {
+      this.options.logger.warn('llm_output_unsupported', { claims });
+      return fallback('unsupported_claims', claims.join(','));
+    }
 
     return { answer: cleanAnswer(output.answer), sources, grounded: true, outcome: 'answered' };
   }

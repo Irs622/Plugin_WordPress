@@ -28,7 +28,7 @@ if [ ! -f cache/sqlite-database-integration.zip ]; then
   curl -fsSL -o cache/sqlite-database-integration.zip https://downloads.wordpress.org/plugin/sqlite-database-integration.zip
 fi
 
-rm -rf "$WP_DIR"
+rm -rf "$WP_DIR" "$TARGET/db"
 mkdir -p "$TARGET/extract"
 unzip -q -o "cache/wordpress-$WP_VERSION.zip" -d "$TARGET/extract"
 mv "$TARGET/extract/wordpress" "$WP_DIR"
@@ -81,11 +81,19 @@ chdir($root);
 require $root . '/index.php';
 PHP
 
+# WP-CLI wrapper used by the README, PHPUnit bootstrap and e2e/run.sh.
+cat > "$TARGET/wp" <<'SH'
+#!/usr/bin/env bash
+exec php -d error_reporting=24575 -d display_errors=stderr "$(dirname "$0")/cache/wp-cli.phar" --path="$(dirname "$0")/wordpress" "$@" 2> >(grep -v -E "Deprecated|^$" >&2)
+SH
+chmod +x "$TARGET/wp"
+
 $WP core install --url="$WP_URL" --title="WKC Test Site" --admin_user=admin --admin_password=admin-pass-123 --admin_email=admin@example.test --skip-email
 $WP rewrite structure '/%postname%/' --hard >/dev/null
 $WP plugin activate sqlite-database-integration >/dev/null 2>&1 || true
 $WP user create editor editor@example.test --role=editor --user_pass=editor-pass-123 >/dev/null
 $WP user create subscriber subscriber@example.test --role=subscriber --user_pass=subscriber-pass-123 >/dev/null
 $WP post create --post_type=page --post_title="Contact" --post_name=contact --post_status=publish >/dev/null
+$WP plugin activate wp-knowledge-chat >/dev/null
 
 echo "WordPress $($WP core version) ready at $WP_DIR (url $WP_URL)"

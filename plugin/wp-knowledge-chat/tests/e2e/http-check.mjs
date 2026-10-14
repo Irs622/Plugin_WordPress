@@ -191,6 +191,6 @@ describe('admin settings (real options.php flow)', () => {
 		const res = await admin.request(`${WP}/wp-admin/admin-post.php`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ action: 'wkc_test_connection', _wpnonce: nonce }) });
 		assert.equal(res.status, 302);
 		const after = await (await admin.request(`${WP}/wp-admin/admin.php?page=wp-knowledge-chat`)).text();
-		assert.match(after, /backend is reachable and its knowledge base is ready/);
+		assert.match(after, /backend is reachable, the shared secret is accepted and the knowledge base is ready/);
 	});
 });

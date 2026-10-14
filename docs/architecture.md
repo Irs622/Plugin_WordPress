@@ -7,12 +7,17 @@
  ───────────────                         ───────────────────────────────                 ───────────────────────────────────        ──────
  chat-widget.js  ── POST same-origin ──▶  /wp-json/wp-knowledge-chat/v1/chat   ── HMAC ──▶  POST /api/chat                    ──▶   Gemini
  (vanilla JS)       {message,language}    • enabled? configured? origin ok?     signed       • verify signature + replay         API
-                                          • validate message (≤500 chars)       HTTPS        • rate limit (client/global/daily)
+                                          • validate message (≤500 chars)       HTTPS        • rate limit (client/global)
                 ◀── {answer,sources, ──   • per-IP sliding-window rate limit               • validate request
-                     grounded}            • salted client id (no raw IP)                   • BM25 retrieval over KB chunks
-                                          • re-validate response, URL allowlist ◀──────────  • no evidence → fallback (no LLM)
+                     grounded}            • salted client id (no raw IP)                   • scope policy → fallback (no LLM)
+                                          • re-validate response, URL allowlist ◀──────────  • BM25 retrieval over KB chunks
+                                                                                             • no evidence / missing answer type
+                                                                                               → fallback (no LLM)
+                                                                                             • daily model-call budget
                                                                                              • prompt with delimited sources
                                                                                              • parse + validate JSON output
+                                                                                             • claim check: numbers/URLs/e-mails/
+                                                                                               phones must appear in evidence
                                                                                              • sources resolved from KB only
  Admin (manage_options) ─ options.php ─▶  Settings API → option wp_knowledge_chat_settings
 
@@ -32,8 +37,8 @@
 | Retrieval | BM25 lexical search, in memory, plus a small Indonesian→English term map | The corpus is 5 pages (10 chunks). The offline evaluation hits the expected document for 100% of answerable questions. Embeddings and pgvector are not justified (PRD §8). |
 | Knowledge-base storage | JSON file (`data/kb.json`), atomic writes | No database to run. The file is diffable and reviewable in git. |
 | Grounding enforcement | Model returns `source_ids` only; backend maps ids → KB title/URL | The model cannot introduce URLs. `grounded:true` without a valid id becomes the fallback. |
-| Unanswerable questions | Retrieval threshold → deterministic fallback **without calling the LLM** | Cheaper, and immune to prompt injection when nothing relevant is retrieved. |
-| Rate limiting | WP: per-IP sliding window (transients). Backend: per-client + global fixed window + daily budget (in memory) | Protects PHP workers and provider cost independently. In-memory limits assume a single backend instance (see deployment). |
+| Unanswerable questions | Scope policy, retrieval threshold and answer-type check → deterministic fallback **without calling the LLM**; claim check after generation | Keyword overlap is not evidence: the gate stops questions whose topic or requested fact type the evidence cannot answer. Cheaper, and immune to prompt injection on those paths. See [evaluation.md](evaluation.md). |
+| Rate limiting | WP: per-IP sliding window (transients; `X-Forwarded-For` only from configured trusted proxies). Backend: per-client + global fixed window (in memory) + daily budget counted per model call | Protects PHP workers and provider cost independently. In-memory limits assume a single backend instance (see deployment). |
 | Widget | Vanilla JS + CSS scoped under `#wkc-root`, deferred, footer | No framework needed. ID-scoped CSS beats Hello Elementor/Elementor kit button styles without `!important`; verified in Chrome. |
 | Conversation memory | `sessionStorage` in the browser only; backend is stateless per question | No personal data stored server-side. Follow-up questions are answered independently (documented limitation). |
 | Content sync | CLI build from a reviewed allowlist + authenticated push | PRD lists automatic sync as P1. `/api/index` accepts documents but never fetches URLs, so it cannot become an SSRF/open proxy. |
@@ -62,12 +67,15 @@ backend/
   src/services/knowledge-base.ts document validation, chunking, store, atomic persistence
   src/services/llm.ts            Gemini client (timeout, retry, error mapping)
   src/services/chat.ts           grounding orchestration, prompt, output validation
+  src/services/scope.ts          scope policy, answer-type evidence check, claim verification
+  src/services/kb-audit.ts       knowledge-base snapshot audit against sources.json
   src/middleware/rate-limit.ts   fixed window + daily budget
   src/lib/{auth,http,logger,html-to-text}.ts
-  scripts/build-kb.ts            builds data/kb.json from data/sources.json
+  scripts/build-kb.ts            builds data/kb.json from data/sources.json (fails on missing required pages)
+  scripts/validate-kb.ts         offline audit of data/kb.json (kb:validate)
   scripts/push-kb.ts             pushes a reviewed KB to /api/index
   scripts/mock-gemini.ts         local Gemini stand-in for tests and offline E2E
-  eval/                          65-question dataset + retrieval/live evaluation runner
+  eval/                          65-question design set, 42-question held-out set, offline/live evaluation runner
 ```
 
 `embeddings.ts` and a plugin-side `class-content-sync.php` from the suggested tree were **intentionally not created**: neither is needed for the MVP, and the PRD asks for no empty modules.

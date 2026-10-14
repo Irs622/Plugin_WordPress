@@ -89,6 +89,78 @@ final class RestControllerTest extends TestCase {
 		$this->assertSame( $expected, $h['X-WKC-Signature'] );
 	}
 
+	public function test_forwarded_for_is_ignored_unless_the_peer_is_a_trusted_proxy(): void {
+		$_SERVER['REMOTE_ADDR'] = '10.0.0.5';
+		$this->add_filter( 'wp_knowledge_chat_rate_limit_per_minute', fn() => 1 );
+		$this->backend( array( 200, self::GOOD ) );
+
+		// Untrusted peer: a spoofed header cannot buy a fresh rate-limit bucket.
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.1';
+		$this->assertSame( 200, $this->chat( array( 'message' => 'Hi' ) )->get_status() );
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.2';
+		$this->assertSame( 429, $this->chat( array( 'message' => 'Hi' ) )->get_status() );
+
+		// Trusted proxy: each forwarded visitor gets their own bucket and client id.
+		$this->add_filter( 'wp_knowledge_chat_trusted_proxies', fn() => array( '10.0.0.0/8' ) );
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.3';
+		$this->assertSame( 200, $this->chat( array( 'message' => 'Hi' ) )->get_status() );
+		$_SERVER['HTTP_X_FORWARDED_FOR'] = '198.51.100.4';
+		$this->assertSame( 200, $this->chat( array( 'message' => 'Hi' ) )->get_status() );
+		$this->assertNotSame( $this->calls[1]['args']['headers']['X-WKC-Client'], $this->calls[2]['args']['headers']['X-WKC-Client'] );
+		unset( $_SERVER['HTTP_X_FORWARDED_FOR'] );
+	}
+
+	public function test_forwarded_for_parsing_uses_the_rightmost_untrusted_hop(): void {
+		$this->add_filter( 'wp_knowledge_chat_trusted_proxies', fn() => array( '10.0.0.0/8', '2001:db8::/32', '192.0.2.7' ) );
+		$this->assertSame( '198.51.100.9', Rest_Controller::client_from_forwarded_for( '1.2.3.4, 198.51.100.9, 10.1.2.3' ), 'left-most entries are client-supplied' );
+		$this->assertSame( '198.51.100.9', Rest_Controller::client_from_forwarded_for( '198.51.100.9,192.0.2.7,2001:db8::1' ) );
+		$this->assertNull( Rest_Controller::client_from_forwarded_for( 'garbage, 10.0.0.1' ) );
+		$this->assertNull( Rest_Controller::client_from_forwarded_for( '10.0.0.1, 10.0.0.2' ), 'only proxies' );
+		$this->assertTrue( Rest_Controller::is_trusted_proxy( '10.255.0.1' ) );
+		$this->assertTrue( Rest_Controller::is_trusted_proxy( '2001:db8:abcd::1' ) );
+		$this->assertFalse( Rest_Controller::is_trusted_proxy( '11.0.0.1' ) );
+		$this->assertFalse( Rest_Controller::is_trusted_proxy( '192.0.2.8' ) );
+		$this->assertFalse( Rest_Controller::is_trusted_proxy( 'not-an-ip' ) );
+	}
+
+	public function test_rate_limited_responses_carry_retry_after(): void {
+		$this->add_filter( 'wp_knowledge_chat_rate_limit_per_minute', fn() => 1 );
+		$this->backend( array( 200, self::GOOD ) );
+		$this->chat( array( 'message' => 'Hi' ) );
+		$limited = $this->chat( array( 'message' => 'Hi' ) );
+		$this->assertSame( 429, $limited->get_status() );
+		$this->assertSame( '60', $limited->get_headers()['Retry-After'] );
+		$this->assertSame( 'wkc_rate_limited', $limited->get_data()['code'] );
+	}
+
+	public function test_backend_429_retry_after_is_passed_through_and_bounded(): void {
+		$this->backend( array( 429, array( 'error' => array( 'code' => 'daily_limit_reached' ) ), array( 'retry-after' => '3600' ) ) );
+		$this->assertSame( '3600', $this->chat( array( 'message' => 'Hi' ) )->get_headers()['Retry-After'] );
+	}
+
+	public function test_backend_failures_fire_an_observability_action_without_content(): void {
+		$seen = array();
+		$this->add_filter(
+			'wp_knowledge_chat_backend_failure',
+			function ( $reason, $status ) use ( &$seen ) {
+				$seen[] = array( $reason, $status );
+			},
+			10,
+			2
+		);
+		$this->backend( array( 401, array( 'error' => array( 'code' => 'unauthorized' ) ) ) );
+		$this->assertSame( 503, $this->chat( array( 'message' => 'Secret question text' ) )->get_status() );
+		$this->assertSame( array( array( 'unauthorized', 401 ) ), $seen );
+	}
+
+	public function test_backend_url_with_query_or_fragment_is_rejected(): void {
+		$this->assertSame( 'https://chat.example.com/base', Backend_Client::normalise_base_url( 'https://chat.example.com/base/' ) );
+		$this->assertSame( 'http://127.0.0.1:8787', Backend_Client::normalise_base_url( 'http://127.0.0.1:8787' ) );
+		foreach ( array( 'https://chat.example.com/?x=1', 'https://chat.example.com/#a', 'http://chat.example.com', 'https://user:pw@chat.example.com', '', null ) as $bad ) {
+			$this->assertNull( Backend_Client::normalise_base_url( $bad ), var_export( $bad, true ) );
+		}
+	}
+
 	public function test_signature_matches_backend_reference_vector(): void {
 		// Same vector as backend/tests: computeSignature('s'*40, '1790000000', nonce, 'abc', body).
 		$this->assertSame(

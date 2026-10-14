@@ -10,8 +10,11 @@ step() { printf '\n\033[1m== %s ==\033[0m\n' "$1"; }
 step "Backend unit + integration tests"
 (cd "$REPO/backend" && npm test)
 
-step "Backend retrieval evaluation (offline)"
-(cd "$REPO/backend" && npm run --silent eval:retrieval)
+step "Knowledge base validation (approved pages, no excluded content)"
+(cd "$REPO/backend" && npm run --silent kb:validate)
+
+step "Backend offline evaluation: design set, then held-out set"
+(cd "$REPO/backend" && npm run --silent eval:retrieval && node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json)
 
 step "Plugin static analysis (WordPress security sniffs + PHP compatibility)"
 (cd "$T" && vendor/bin/phpcs --standard=phpcs.xml.dist)
@@ -27,5 +30,8 @@ step "End-to-end: WordPress + backend + mock Gemini, HTTP and headless Chrome"
 
 step "Package plugin ZIP"
 "$REPO/scripts/package-plugin.sh" > /dev/null && ls -l "$REPO/dist/"
+
+step "Package lifecycle: checksum, install from ZIP, activate, deactivate, uninstall, reinstall"
+"$T/bin/package-check.sh"
 
 printf '\nAll checks passed.\n'

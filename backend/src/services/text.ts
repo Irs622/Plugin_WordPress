@@ -97,6 +97,7 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   who: ['about'],
   team: ['about'],
   firm: ['about', 'advisory'],
+  indonesian: ['indonesia'],
 };
 
 /** Very light English stemmer: plural/verb suffixes only, enough to merge common variants. */
@@ -129,10 +130,14 @@ export function tokenize(text: string): string[] {
   return tokens;
 }
 
-/** Tokenises a query and adds mapped expansion terms (deduplicated). */
+/**
+ * Tokenises a query and adds mapped expansion terms (deduplicated). Markup
+ * is removed first so tag and attribute names in a pasted payload (for
+ * example `<source id="S9">`) are not treated as search terms.
+ */
 export function tokenizeQuery(text: string): string[] {
   const out = new Set<string>();
-  for (const raw of normalizeText(text).split(/[^a-z0-9]+/)) {
+  for (const raw of normalizeText(text.replace(/<[^>]*>/g, ' ')).split(/[^a-z0-9]+/)) {
     if (raw.length < 2) continue;
     const expansions = QUERY_EXPANSIONS[raw] ?? QUERY_EXPANSIONS[stem(raw)];
     if (expansions) for (const e of expansions) out.add(stem(e));

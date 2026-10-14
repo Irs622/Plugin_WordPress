@@ -186,7 +186,12 @@ export class KnowledgeBaseStore {
     return this.all().flatMap((doc) => chunkDocument(doc));
   }
 
-  /** Replaces the whole store from raw data, validating every document. Invalid documents are reported and skipped. */
+  /**
+   * Replaces the whole store from raw data, validating every document.
+   * Invalid documents are reported and skipped; a repeated id keeps the
+   * first occurrence and reports the others, so a later entry can never
+   * silently replace reviewed content.
+   */
   loadFrom(data: unknown): { loaded: number; rejected: { index: number; field: string }[] } {
     const rejected: { index: number; field: string }[] = [];
     const next = new Map<string, KnowledgeDocument>();
@@ -197,6 +202,7 @@ export class KnowledgeBaseStore {
     documents.forEach((raw, index) => {
       try {
         const doc = validateDocument(raw, this.allowedHosts);
+        if (next.has(doc.id)) throw new DocumentValidationError('id', 'Duplicate document id.');
         next.set(doc.id, doc);
       } catch (err) {
         rejected.push({ index, field: err instanceof DocumentValidationError ? err.field : 'unknown' });

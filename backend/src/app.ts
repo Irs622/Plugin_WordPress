@@ -30,13 +30,14 @@ export function createApp({ config, store, llm, logger, now = () => Date.now() }
     topK: config.retrievalTopK,
     minScore: config.retrievalMinScore,
     secrets: [config.geminiApiKey, config.chatSharedSecret, config.indexApiToken],
+    budget: new DailyBudget(config.dailyRequestLimit, now),
   });
+  const verifier = new SignatureVerifier(config.chatSharedSecret, config.signatureMaxSkewSeconds, now);
 
   const chatDeps = {
-    verifier: new SignatureVerifier(config.chatSharedSecret, config.signatureMaxSkewSeconds, now),
+    verifier,
     clientLimiter: new FixedWindowLimiter(config.rateLimitPerClientPerMinute, 60_000, now),
     globalLimiter: new FixedWindowLimiter(config.rateLimitGlobalPerMinute, 60_000, now),
-    dailyBudget: new DailyBudget(config.dailyRequestLimit, now),
     chat,
     store,
     logger,
@@ -57,7 +58,7 @@ export function createApp({ config, store, llm, logger, now = () => Date.now() }
   const routes: Record<string, { method: string; handle: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void }> = {
     '/api/chat': { method: 'POST', handle: (req, res) => handleChat(req, res, chatDeps) },
     '/api/index': { method: 'POST', handle: (req, res) => handleIndex(req, res, indexDeps) },
-    '/api/health': { method: 'GET', handle: (_req, res) => handleHealth(res, store) },
+    '/api/health': { method: 'GET', handle: (req, res) => handleHealth(req, res, { store, verifier, logger }) },
   };
 
   return (req, res) => {

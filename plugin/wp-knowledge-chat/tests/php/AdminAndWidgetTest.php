@@ -3,6 +3,7 @@
 namespace WP_Knowledge_Chat\Tests;
 
 use WP_Knowledge_Chat\Admin_Page;
+use WP_Knowledge_Chat\Backend_Client;
 use WP_Knowledge_Chat\Plugin;
 use WP_Knowledge_Chat\Settings;
 
@@ -78,6 +79,67 @@ final class AdminAndWidgetTest extends TestCase {
 			$this->assertStringContainsString( 'page=wp-knowledge-chat', $e->getMessage() );
 		}
 		$this->assertSame( array( 'ok' => true, 'status' => 200 ), get_transient( 'wkc_health_' . $this->user_id( 'admin' ) ) );
+	}
+
+	public function test_connection_test_is_signed_and_reports_a_rejected_secret(): void {
+		wp_set_current_user( $this->user_id( 'admin' ) );
+		$_REQUEST['_wpnonce'] = wp_create_nonce( Admin_Page::HEALTH_ACTION );
+		$seen                 = array();
+		$this->add_filter(
+			'pre_http_request',
+			function ( $pre, $args, $url ) use ( &$seen ) {
+				$seen = array( 'url' => $url, 'headers' => $args['headers'] );
+				return array( 'response' => array( 'code' => 401 ), 'body' => '{"error":{"code":"unauthorized"}}', 'headers' => array(), 'cookies' => array() );
+			},
+			10,
+			3
+		);
+		$this->add_filter( 'wp_redirect', function ( $location ) {
+			throw new RedirectException( $location );
+		} );
+		try {
+			( new Admin_Page() )->handle_test_connection();
+		} catch ( RedirectException $e ) {
+			// Expected.
+		}
+		$this->assertSame( 'http://127.0.0.1:8787/api/health', $seen['url'] );
+		$h = $seen['headers'];
+		$this->assertSame(
+			Backend_Client::sign( (string) getenv( 'WKC_SHARED_SECRET' ), $h['X-WKC-Timestamp'], $h['X-WKC-Nonce'], $h['X-WKC-Client'], '' ),
+			$h['X-WKC-Signature']
+		);
+		$this->assertSame( array( 'ok' => false, 'status' => 401 ), get_transient( 'wkc_health_' . $this->user_id( 'admin' ) ) );
+
+		ob_start();
+		( new Admin_Page() )->render();
+		$html = (string) ob_get_clean();
+		$this->assertStringContainsString( 'rejected the shared secret', $html );
+		$this->assertStringNotContainsString( (string) getenv( 'WKC_SHARED_SECRET' ), $html );
+	}
+
+	public function test_contact_url_help_does_not_assert_an_unapproved_contact_page(): void {
+		wp_set_current_user( $this->user_id( 'admin' ) );
+		ob_start();
+		( new Admin_Page() )->render_field( array( 'key' => 'contact_url', 'label_for' => 'wkc-contact-url' ) );
+		$this->assertStringNotContainsString( '/contact/', (string) ob_get_clean() );
+		$this->assertSame( 'https://inpartnerglobal.com', Settings::defaults()['contact_url'] );
+	}
+
+	public function test_settings_changes_purge_litespeed_page_cache(): void {
+		$purges = 0;
+		$this->add_filter(
+			'litespeed_purge_all',
+			function () use ( &$purges ) {
+				++$purges;
+			}
+		);
+		// First save after activation: the stored value still equals the registered default.
+		update_option( Settings::OPTION, array( 'greeting_message' => 'Changed greeting' ) + Settings::defaults() );
+		$this->assertSame( 1, $purges );
+		update_option( Settings::OPTION, array( 'greeting_message' => 'Changed greeting' ) + Settings::defaults() );
+		$this->assertSame( 1, $purges, 'unchanged settings do not purge' );
+		update_option( Settings::OPTION, array( 'enabled' => false ) + Settings::defaults() );
+		$this->assertSame( 2, $purges, 'disabling the widget purges' );
 	}
 
 	public function test_admin_menu_requires_manage_options(): void {

@@ -58,7 +58,8 @@ echo "== Browser checks (headless Chrome) =="
 (cd "$TESTS" && node e2e/browser-check.mjs)
 
 echo "== Log review =="
-if grep -iE "knowledge-chat|wp_knowledge_chat|WP_Knowledge_Chat" "$WPT/debug.log" 2>/dev/null; then
+# Match the plugin's own files (symlinked or real path) and namespace, not any path that merely contains the name.
+if grep -E "(plugins|plugin)/wp-knowledge-chat/(wp-knowledge-chat\.php|uninstall\.php|includes/|assets/)|WP_Knowledge_Chat\\\\" "$WPT/debug.log" 2>/dev/null; then
   echo "Plugin-related entries found in debug.log" >&2; exit 1
 fi
 if grep -F "$WKC_SHARED_SECRET" "$LOGS"/*.log || grep -F "$E2E_GEMINI_KEY" "$LOGS/backend.log"; then

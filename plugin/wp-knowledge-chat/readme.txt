@@ -50,9 +50,9 @@ The AI backend must be deployed first (see `docs/deployment.md` in the project r
 
    The URL must use https. The secret must be at least 32 characters.
 3. Activate the plugin.
-4. Go to **WP Knowledge Chat → Settings** and set the Contact URL, for example `https://inpartnerglobal.com/contact/`.
-5. Click **Test connection**. It should report that the backend is reachable and its knowledge base is ready.
-6. If a page cache is active (for example LiteSpeed Cache), purge it.
+4. Go to **WP Knowledge Chat → Settings** and review the settings. The Contact URL defaults to the homepage (`https://inpartnerglobal.com`); change it to a dedicated contact page only once the site owner has approved that page.
+5. Click **Test connection**. It should report that the backend is reachable, the shared secret is accepted and the knowledge base is ready.
+6. If a page cache other than LiteSpeed Cache is active, purge it. LiteSpeed Cache is purged automatically when the settings change.
 
 The widget stays hidden until both constants are defined and valid.
 
@@ -65,7 +65,7 @@ The widget stays hidden until both constants are defined and valid.
 * **Default Language**: English (`en`) or Bahasa Indonesia (`id`). Controls the interface language and the preferred answer language.
 * **Contact URL**: an absolute `https://` URL on an approved domain (inpartnerglobal.com, www.inpartnerglobal.com, or this site's own domain), without a username/password or a custom port. The URL is never fetched by the server.
 
-All settings are stored in the single option `wp_knowledge_chat_settings`. Invalid values are rejected with an error message, and the previous value is kept.
+All settings are stored in the single option `wp_knowledge_chat_settings`. Invalid values are rejected with an error message, and the previous value is kept. Saving changed settings triggers a LiteSpeed Cache purge (`litespeed_purge_all`), because the greeting, language and contact link are embedded in cached pages.
 
 == Frequently Asked Questions ==
 
@@ -77,14 +77,16 @@ Check, in order:
 2. The settings page shows "AI backend: Configured". Both `wp-config.php` constants must be present, the URL must use https, and the secret must be at least 32 characters.
 3. No code restricts the widget through the `wp_knowledge_chat_should_load` filter.
 4. You are viewing the public site. The widget is never loaded in wp-admin or the Elementor editor preview.
-5. The page cache has been purged.
+5. The page cache has been purged (automatic for LiteSpeed Cache after a settings change; manual for other caches).
 
 = Every question returns "The assistant is unavailable right now". =
 
 The backend cannot be reached or rejected the request. Use **Test connection** on the settings page.
 
-* If the test fails, check the backend URL and that the service is running, and that the hosting allows outbound HTTPS.
-* If the test passes but chat still fails, the shared secret probably differs between `wp-config.php` and the backend, or the server clocks differ by more than 5 minutes.
+* "rejected the shared secret": `WP_KNOWLEDGE_CHAT_SHARED_SECRET` differs from the backend's `CHAT_SHARED_SECRET`, or the server clocks differ by more than 5 minutes.
+* "knowledge base is empty": the backend is running without `data/kb.json`.
+* Other failures: check the backend URL, that the service is running, and that the hosting allows outbound HTTPS.
+* If the test passes but chat still fails, check the backend logs (`llm_failed kind=auth` means the Gemini key is invalid; `rate_limited scope=daily` means the daily model-call budget is used up).
 
 = Does the plugin store visitor conversations? =
 
@@ -104,7 +106,11 @@ Yes. Add to a small mu-plugin or the child theme's `functions.php`:
 
 = Visitors behind a proxy or CDN all get rate-limited together. =
 
-By default the plugin uses `REMOTE_ADDR`. Behind a trusted proxy, return the real visitor IP with the `wp_knowledge_chat_client_ip` filter. Only read a header that your proxy sets and overwrites, because visitors can forge others.
+By default the plugin uses `REMOTE_ADDR` and ignores `X-Forwarded-For`, which visitors can forge. Behind a reverse proxy or CDN, list the proxy addresses in `wp-config.php`:
+
+    define( 'WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES', '10.0.0.0/8, 2001:db8::/32' );
+
+Only when the direct peer (`REMOTE_ADDR`) is in that list does the plugin read `X-Forwarded-For`, taking the right-most address that is not itself a trusted proxy. Use the provider's published proxy ranges, and nothing broader. For a header other than `X-Forwarded-For`, use the `wp_knowledge_chat_client_ip` filter instead.
 
 = Is a WordPress nonce used for the chat requests? =
 
@@ -118,7 +124,12 @@ No, by design. The chat endpoint is public, and a nonce authorises nothing for a
 * `wp_knowledge_chat_allowed_source_hosts` (string[]): domains allowed for source links.
 * `wp_knowledge_chat_allowed_origins` (string[]): hostnames allowed to call the chat endpoint from a browser.
 * `wp_knowledge_chat_rate_limit_per_minute` (int, default 6): chat requests per visitor per minute.
-* `wp_knowledge_chat_client_ip` (string): the IP address used for rate limiting.
+* `wp_knowledge_chat_client_ip` (string $ip, string $remote_addr): the IP address used for rate limiting.
+* `wp_knowledge_chat_trusted_proxies` (string[]): proxy IPs/CIDR ranges whose `X-Forwarded-For` is trusted (default: `WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES`, empty).
+
+Developer action:
+
+* `wp_knowledge_chat_backend_failure` (string $reason, int $status): fires when a chat request fails because of the backend (`unreachable`, `unauthorized`, `rate_limited`, `http_error`, `invalid_response`). Receives no message text or IP; hook it to log or alert.
 
 REST endpoint: `POST /wp-json/wp-knowledge-chat/v1/chat` with `{"message": "...", "language": "en"}`. The full contract is in `docs/api-contract.md`.
 

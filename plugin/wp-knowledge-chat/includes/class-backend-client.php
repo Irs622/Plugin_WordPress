@@ -22,12 +22,19 @@ final class Backend_Client {
 	private const MIN_SECRET_LENGTH = 32;
 
 	public static function base_url(): ?string {
-		$url = defined( 'WP_KNOWLEDGE_CHAT_BACKEND_URL' ) ? constant( 'WP_KNOWLEDGE_CHAT_BACKEND_URL' ) : '';
+		return self::normalise_base_url( defined( 'WP_KNOWLEDGE_CHAT_BACKEND_URL' ) ? constant( 'WP_KNOWLEDGE_CHAT_BACKEND_URL' ) : '' );
+	}
+
+	/**
+	 * @param mixed $url Configured backend URL.
+	 */
+	public static function normalise_base_url( $url ): ?string {
 		if ( ! is_string( $url ) || '' === $url ) {
 			return null;
 		}
 		$parts = wp_parse_url( $url );
-		if ( ! is_array( $parts ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) ) {
+		// The plugin appends /api/... to this value, so a query or fragment would corrupt every request.
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) || isset( $parts['user'] ) || isset( $parts['pass'] ) || isset( $parts['query'] ) || isset( $parts['fragment'] ) ) {
 			return null;
 		}
 		$scheme   = $parts['scheme'] ?? '';
@@ -98,20 +105,31 @@ final class Backend_Client {
 	}
 
 	/**
-	 * Lightweight connectivity check used by the admin "Test connection" action.
+	 * Connectivity check used by the admin "Test connection" action. The
+	 * request is signed (empty body), so the backend also verifies the shared
+	 * secret: a mismatch returns 401 instead of a misleading success.
 	 *
 	 * @return array{ok:bool, status:int}
 	 */
 	public static function health(): array {
-		if ( null === self::base_url() ) {
+		if ( ! self::is_configured() ) {
 			return array( 'ok' => false, 'status' => 0 );
 		}
-		$response = wp_remote_get(
+		$timestamp = (string) time();
+		$nonce     = bin2hex( random_bytes( 16 ) );
+		$client_id = 'wp-admin-health';
+		$response  = wp_remote_get(
 			self::base_url() . '/api/health',
 			array(
 				'timeout'             => 5,
 				'redirection'         => 0,
 				'limit_response_size' => 4096,
+				'headers'             => array(
+					'X-WKC-Timestamp' => $timestamp,
+					'X-WKC-Nonce'     => $nonce,
+					'X-WKC-Client'    => $client_id,
+					'X-WKC-Signature' => self::sign( self::secret(), $timestamp, $nonce, $client_id, '' ),
+				),
 			)
 		);
 		if ( is_wp_error( $response ) ) {

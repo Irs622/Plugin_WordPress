@@ -8,7 +8,7 @@
 ![Node.js 20.11+](https://img.shields.io/badge/Node.js-20.11%2B-339933)
 ![Version 0.1.0](https://img.shields.io/badge/version-0.1.0-informational)
 
-> **Status: MVP, verified locally, not deployed.** All automated suites pass ([test report](docs/test-report.md)). The real Gemini model has **not** been exercised yet (no API key), and the plugin has not run on the production host or a staging copy. It is not production-ready until the staging checklist in [docs/deployment.md](docs/deployment.md) is complete.
+> **Status: MVP, verified locally, not deployed. Ready for staging, not for production.** All automated suites pass ([test report](docs/test-report.md)). The real Gemini model has **not** been exercised yet (no API key), and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy. It is not production-ready until the staging checklist in [docs/deployment.md](docs/deployment.md) is complete and the open content questions are answered.
 
 ## Contents
 
@@ -45,7 +45,8 @@
 - No secret in the browser or the WordPress database.
 - Signed WordPress→backend requests, rate limits on both tiers and a daily request budget.
 - Draft and private content can never be indexed. Source URLs are restricted to approved domains.
-- Questions with no matching content get the fallback without calling the AI, so they cost nothing.
+- Questions the site cannot answer (no matching content, a fact type the pages do not contain such as prices, or out-of-scope requests such as investment advice or prompt injection) get the fallback without calling the AI, so they cost nothing.
+- Answers containing numbers, links, e-mail addresses or phone numbers that are not on the cited pages are replaced by the fallback.
 
 ## How it works
 
@@ -95,8 +96,8 @@ Full list with versions and the reasons for each choice: [docs/tech-stack.md](do
 ├── backend/                      Node.js + TypeScript AI service
 │   ├── src/                      server, routes, services, middleware
 │   ├── data/                     sources.json (approved pages), kb.json (snapshot)
-│   ├── eval/                     65-question evaluation set and runner
-│   ├── scripts/                  build-kb, push-kb, mock-gemini
+│   ├── eval/                     65-question design set, 42-question held-out set, runner
+│   ├── scripts/                  build-kb, validate-kb, push-kb, mock-gemini
 │   └── tests/
 ├── docs/                         project documentation and screenshots
 ├── scripts/                      package-plugin.sh, test-all.sh
@@ -123,27 +124,30 @@ curl http://127.0.0.1:8787/api/health
 # No Gemini key yet? Use the local stand-in (deterministic, not a real model):
 #   npm run mock:gemini   and set GEMINI_API_BASE_URL=http://127.0.0.1:8790 in .env
 
-# 2. Disposable local WordPress 7.1.3 (SQLite, no MySQL) with the plugin linked in
+# 2. Disposable local WordPress 7.1.3 (SQLite, no MySQL) with the plugin linked in and activated
 cd ../plugin/wp-knowledge-chat/tests
 composer install && npm install
-bin/setup-wp.sh                   # creates <repo>/.wp-test
-../../../.wp-test/wp plugin activate wp-knowledge-chat
+bin/setup-wp.sh                   # creates <repo>/.wp-test (and its `wp` wrapper)
+# needed for e2e/run.sh: Hello Elementor + Elementor (see tests/README.md)
 ```
 
 ## Testing
 
 ```bash
-scripts/test-all.sh               # backend, evaluation, phpcs, PHPUnit, widget, E2E + Chrome, packaging
+scripts/test-all.sh               # backend, KB validation, evaluation, phpcs, PHPUnit, widget, E2E + Chrome, packaging + ZIP lifecycle
 ```
 
 | Suite | Command | Result (2026-10-14) |
 |---|---|---|
-| Backend | `cd backend && npm test` | 64 / 64 |
-| Retrieval evaluation | `npm run eval:retrieval` | 33 / 33 answerable questions find the right page |
+| Backend | `cd backend && npm test` | 95 / 95 |
+| Knowledge base | `npm run kb:validate` | 0 errors (1 warning: optional M&A page empty) |
+| Offline evaluation, design set | `npm run eval:retrieval` | 32 / 32 answerable reach the model with the right page; 25 / 25 unanswerable stopped before the model |
+| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 18 / 20 answerable; 16 / 22 unanswerable stopped |
 | Static analysis | `cd plugin/wp-knowledge-chat/tests && vendor/bin/phpcs` | 0 findings |
-| Plugin (real WordPress) | `vendor/bin/phpunit` | 61 / 61 |
+| Plugin (real WordPress) | `vendor/bin/phpunit` | 72 / 72 |
 | Widget | `npm run test:widget` | 22 / 22 |
 | End-to-end + browser | `e2e/run.sh` | 12 / 12 HTTP, 14 / 14 Chrome |
+| ZIP lifecycle | `bin/package-check.sh` | install, activate, deactivate, uninstall, reinstall |
 
 The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (see [docs/evaluation.md](docs/evaluation.md)).
 
@@ -151,10 +155,10 @@ The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (se
 
 | Where | What |
 |---|---|
-| `wp-config.php` | `WP_KNOWLEDGE_CHAT_BACKEND_URL` (https) and `WP_KNOWLEDGE_CHAT_SHARED_SECRET` (≥ 32 characters) |
+| `wp-config.php` | `WP_KNOWLEDGE_CHAT_BACKEND_URL` (https, no query string) and `WP_KNOWLEDGE_CHAT_SHARED_SECRET` (≥ 32 characters); optional `WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES` behind a CDN/reverse proxy |
 | WordPress admin | Enable Chatbot · Greeting Message · Default Language (`en`/`id`) · Contact URL (https, approved domain) |
 | Backend environment | `GEMINI_API_KEY`, `CHAT_SHARED_SECRET`, `INDEX_API_TOKEN` + optional tuning; see [.env.example](.env.example) |
-| Developer filters | `wp_knowledge_chat_should_load`, `…_suggested_questions`, `…_allowed_contact_hosts`, `…_allowed_source_hosts`, `…_allowed_origins`, `…_rate_limit_per_minute`, `…_client_ip`; see [readme.txt](plugin/wp-knowledge-chat/readme.txt) |
+| Developer filters | `wp_knowledge_chat_should_load`, `…_suggested_questions`, `…_allowed_contact_hosts`, `…_allowed_source_hosts`, `…_allowed_origins`, `…_rate_limit_per_minute`, `…_client_ip`, `…_trusted_proxies`; action `wp_knowledge_chat_backend_failure`; see [readme.txt](plugin/wp-knowledge-chat/readme.txt) |
 
 ## Deployment
 
@@ -162,8 +166,8 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 
 1. Deploy the backend to an HTTPS Node.js host (single instance) with its environment variables set.
 2. Build the plugin ZIP: `scripts/package-plugin.sh` → `dist/wp-knowledge-chat-0.1.0.zip`.
-3. On **staging**: add the two `wp-config.php` constants, upload and activate the ZIP, set the Contact URL to `https://inpartnerglobal.com/contact/`, and click **Test connection**.
-4. Run `npm run eval:live` and have Inpartner review the answers.
+3. On **staging**: verify the ZIP checksum, add the `wp-config.php` constants, upload and activate the ZIP, and click **Test connection**. Keep the Contact URL at the homepage default unless the owner approves a dedicated contact page.
+4. Run `npm run eval:live` against the staging backend with a real Gemini key and have Inpartner review the answers.
 5. Go to production only with the site owner's explicit approval.
 
 ## Documentation
@@ -174,7 +178,7 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 | Developers | [Architecture](docs/architecture.md) · [Tech stack](docs/tech-stack.md) · [API contract](docs/api-contract.md) · [Backend README](backend/README.md) · [Plugin readme.txt](plugin/wp-knowledge-chat/readme.txt) · [Contributing](CONTRIBUTING.md) |
 | Operations | [Deployment, rollback & troubleshooting](docs/deployment.md) · [Knowledge base](docs/knowledge-base.md) |
 | Security | [Security design](docs/security.md) · [Security policy](SECURITY.md) |
-| Quality | [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
+| Quality | [Audit report](docs/audit-report.md) · [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
 | Product | [PRD](prd.md) · [Changelog](CHANGELOG.md) |
 
 ## Known limitations
@@ -182,7 +186,9 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 - Answer quality with the real Gemini model has not been measured yet.
 - Each question is answered on its own: follow-ups such as "tell me more" lack context.
 - The assistant knows only 5 approved pages. The Cross-Border M&A page is empty and there is no FAQ or pricing page, so many questions get the fallback.
-- Backend rate limits are in memory, so run a single instance.
+- Backend rate limits and the replay cache are in memory, so run a single instance.
+- Out-of-scope detection is keyword-based (English/Indonesian) and can be evaded by rephrasing; the model and the claim check are the second line.
+- The assistant gives no phone number until Inpartner confirms which of the two published numbers is correct.
 - Not yet tested with MySQL, LiteSpeed Cache or on real mobile devices.
 
 The full list is in the [test report](docs/test-report.md#known-limitations).

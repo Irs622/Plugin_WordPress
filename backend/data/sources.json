@@ -1,5 +1,5 @@
 {
-  "$comment": "Approved knowledge-base sources. Only pages listed under 'documents' are fetched and indexed. Review with the Inpartner team before every rebuild. Verified against the live site on 2026-10-14.",
+  "$comment": "Approved knowledge-base sources. Only pages listed under 'documents' are fetched and indexed. Review with the Inpartner team before every rebuild. 'optional' pages may be absent (for example, no body text yet); every other page must build or kb:build fails. Verified against the live site on 2026-10-14.",
   "site": "https://inpartnerglobal.com",
   "global_exclude_patterns": [
     "^start a convertation$",
@@ -15,8 +15,10 @@
     "^free consultation$",
     "^view all insight$",
     "^no content is added yet\\.?$",
-    "^our service$"
+    "^our service$",
+    "^\\+?[\\d\\s().-]{9,}$"
   ],
+  "$phone_policy": "Lines that consist only of a phone number are excluded: the footer (+62 859-3454-8202) and the Contact page (+62 896 2831 0192) disagree. Remove the pattern above only after the Inpartner content owner confirms the authoritative number.",
   "documents": [
     {
       "id": "page-196-home",
@@ -51,7 +53,8 @@
       "id": "page-1052-cross-border-ma",
       "wp_id": 1052,
       "category": "service",
-      "notes": "Page body was empty on 2026-10-14. The build skips empty pages; it will be indexed automatically once content is published."
+      "notes": "Page body was empty on 2026-10-14. The build skips empty pages; it will be indexed automatically once content is published.",
+      "optional": true
     },
     {
       "id": "page-445-contact",
@@ -59,9 +62,10 @@
       "category": "contact",
       "exclude_patterns": [
         "\\(406\\) 555-0120",
-        "take control of your financial future"
+        "take control of your financial future",
+        "^call us$"
       ],
-      "notes": "Excluded lines look like theme placeholder text (a fictional 555 number). Confirm with Inpartner. The footer phone (+62 859-3454-8202) also differs from this page (+62 896 2831 0192)."
+      "notes": "Excluded lines look like theme placeholder text (a fictional 555 number). The phone number is excluded by the global phone pattern until the authoritative number is confirmed; the 'Call Us' label is removed with it. The contact e-mail domain (inpartner.id) differs from the website domain: confirm with Inpartner."
     }
   ],
   "excluded": [

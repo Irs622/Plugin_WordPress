@@ -64,9 +64,9 @@ chore: bump typescript
 Content changes need approval from the Inpartner content owner. Follow [docs/knowledge-base.md](docs/knowledge-base.md):
 
 1. Edit `backend/data/sources.json`.
-2. Run `npm run kb:build`.
+2. Run `npm run kb:build` (fails if a required page cannot be built; the old `kb.json` is kept).
 3. Review the `git diff` of `kb.json`.
-4. Run `npm run eval:retrieval`.
+4. Run `npm run kb:validate`, then `npm run eval:retrieval` and `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json`.
 
 ## Releases
 

@@ -82,8 +82,7 @@ final class Rest_Controller {
 
 		$ip = $this->client_ip();
 		if ( ! $this->rate_limit_allows( $ip ) ) {
-			$response = $this->error( 'wkc_rate_limited', 'rate_limited', $language, 429 );
-			return $response;
+			return $this->rate_limited( $language, MINUTE_IN_SECONDS );
 		}
 
 		// The backend receives an opaque, salted identifier, never the visitor's IP address.
@@ -91,17 +90,21 @@ final class Rest_Controller {
 		$result    = Backend_Client::chat( $message, $language, $client_id );
 
 		if ( is_wp_error( $result ) ) {
+			self::report_backend_failure( 'unreachable', 0 );
 			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
 		}
 		if ( 429 === $result['status'] ) {
-			return $this->error( 'wkc_rate_limited', 'rate_limited', $language, 429 );
+			self::report_backend_failure( 'rate_limited', 429 );
+			return $this->rate_limited( $language, $result['retry_after'] ?? MINUTE_IN_SECONDS );
 		}
 		if ( 200 !== $result['status'] ) {
+			self::report_backend_failure( 401 === $result['status'] ? 'unauthorized' : 'http_error', $result['status'] );
 			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
 		}
 
 		$clean = self::sanitize_backend_response( $result['body'] );
 		if ( null === $clean ) {
+			self::report_backend_failure( 'invalid_response', 200 );
 			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
 		}
 
@@ -180,16 +183,106 @@ final class Rest_Controller {
 		return is_string( $origin_host ) && in_array( strtolower( $origin_host ), array_map( 'strtolower', (array) $allowed ), true );
 	}
 
+	/**
+	 * Lets operators observe backend failures (for example to log or alert)
+	 * without the plugin writing logs itself. No message text or IP is passed.
+	 */
+	private static function report_backend_failure( string $reason, int $status ): void {
+		/**
+		 * Fires when a chat request could not be answered because of the backend.
+		 *
+		 * @param string $reason unreachable, unauthorized, rate_limited, http_error or invalid_response.
+		 * @param int    $status Backend HTTP status, 0 when unreachable.
+		 */
+		do_action( 'wp_knowledge_chat_backend_failure', $reason, $status );
+	}
+
 	private function client_ip(): string {
-		$ip = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		$remote = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		$ip     = $remote;
+		// X-Forwarded-For is client-controlled. It is read only when the direct
+		// peer is a proxy the site owner listed in WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES.
+		if ( '' !== $remote && self::is_trusted_proxy( $remote ) && isset( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
+			$forwarded = sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) );
+			$ip        = self::client_from_forwarded_for( $forwarded ) ?? $remote;
+		}
 		/**
 		 * Filters the visitor IP used for rate limiting. Only override this
 		 * (e.g. to read a CDN header) when the header is set by a trusted proxy.
 		 *
-		 * @param string $ip REMOTE_ADDR.
+		 * @param string $ip     Visitor IP (REMOTE_ADDR, or the forwarded client behind a trusted proxy).
+		 * @param string $remote REMOTE_ADDR.
 		 */
-		$ip = apply_filters( 'wp_knowledge_chat_client_ip', $ip );
+		$ip = apply_filters( 'wp_knowledge_chat_client_ip', $ip, $remote );
 		return is_string( $ip ) && filter_var( $ip, FILTER_VALIDATE_IP ) ? $ip : '0.0.0.0';
+	}
+
+	/**
+	 * The client is the right-most X-Forwarded-For entry that is not itself a
+	 * trusted proxy: entries further left were supplied by the client and can
+	 * be forged.
+	 */
+	public static function client_from_forwarded_for( string $header ): ?string {
+		$hops = array_reverse( array_map( 'trim', explode( ',', $header ) ) );
+		foreach ( $hops as $hop ) {
+			if ( ! filter_var( $hop, FILTER_VALIDATE_IP ) ) {
+				return null;
+			}
+			if ( ! self::is_trusted_proxy( $hop ) ) {
+				return $hop;
+			}
+		}
+		return null;
+	}
+
+	/**
+	 * @return string[] IPs or CIDR ranges from WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES (comma-separated).
+	 */
+	private static function trusted_proxies(): array {
+		$value = defined( 'WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES' ) ? constant( 'WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES' ) : '';
+		if ( is_array( $value ) ) {
+			$value = implode( ',', $value );
+		}
+		$proxies = is_string( $value ) ? array_values( array_filter( array_map( 'trim', explode( ',', $value ) ) ) ) : array();
+		/**
+		 * Filters the reverse proxies (IPs or CIDR ranges) whose X-Forwarded-For header is trusted.
+		 *
+		 * @param string[] $proxies From WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES; empty by default.
+		 */
+		$proxies = apply_filters( 'wp_knowledge_chat_trusted_proxies', $proxies );
+		return is_array( $proxies ) ? array_values( array_filter( $proxies, 'is_string' ) ) : array();
+	}
+
+	public static function is_trusted_proxy( string $ip ): bool {
+		$packed = inet_pton( $ip );
+		if ( false === $packed ) {
+			return false;
+		}
+		foreach ( self::trusted_proxies() as $range ) {
+			[ $network, $bits ] = array_pad( explode( '/', $range, 2 ), 2, null );
+			$net                = inet_pton( (string) $network );
+			if ( false === $net || strlen( $net ) !== strlen( $packed ) ) {
+				continue;
+			}
+			$max  = 8 * strlen( $net );
+			$bits = null === $bits ? $max : (int) $bits;
+			if ( $bits < 0 || $bits > $max ) {
+				continue;
+			}
+			$bytes = intdiv( $bits, 8 );
+			$rest  = $bits % 8;
+			if ( substr( $packed, 0, $bytes ) !== substr( $net, 0, $bytes ) ) {
+				continue;
+			}
+			if ( 0 === $rest ) {
+				return true;
+			}
+			$mask = ( 0xff << ( 8 - $rest ) ) & 0xff;
+			if ( ( ord( $packed[ $bytes ] ) & $mask ) === ( ord( $net[ $bytes ] ) & $mask ) ) {
+				return true;
+			}
+		}
+		return false;
 	}
 
 	/**
@@ -220,6 +313,16 @@ final class Rest_Controller {
 		}
 		set_transient( $key( $window ), $current + 1, 2 * MINUTE_IN_SECONDS + 5 );
 		return true;
+	}
+
+	/**
+	 * 429 response with a Retry-After header (bounded to one day).
+	 */
+	private function rate_limited( string $language, int $retry_after ): \WP_REST_Response {
+		$response = rest_convert_error_to_response( $this->error( 'wkc_rate_limited', 'rate_limited', $language, 429 ) );
+		$response->header( 'Retry-After', (string) max( 1, min( $retry_after, DAY_IN_SECONDS ) ) );
+		$response->header( 'Cache-Control', 'no-store, private' );
+		return $response;
 	}
 
 	private function error( string $code, string $kind, string $language, int $status ): \WP_Error {

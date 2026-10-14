@@ -110,9 +110,16 @@ final class Settings {
 
 		$clean = $current;
 
-		// A checkbox is absent when unticked; accept only canonical "on" values.
-		$enabled          = $input['enabled'] ?? false;
-		$clean['enabled'] = true === $enabled || in_array( $enabled, array( '1', 1, 'on', 'yes', 'true' ), true );
+		// A checkbox is absent when unticked. Canonical on/off values are accepted;
+		// anything else is rejected and the saved value kept.
+		$enabled = $input['enabled'] ?? false;
+		if ( true === $enabled || in_array( $enabled, array( '1', 1, 'on', 'yes', 'true' ), true ) ) {
+			$clean['enabled'] = true;
+		} elseif ( false === $enabled || in_array( $enabled, array( '0', 0, '', 'off', 'no', 'false' ), true ) ) {
+			$clean['enabled'] = false;
+		} else {
+			self::error( 'enabled', __( 'Enable Chatbot must be checked or unchecked.', 'wp-knowledge-chat' ) );
+		}
 
 		if ( array_key_exists( 'greeting_message', $input ) ) {
 			$greeting = self::validate_greeting( $input['greeting_message'] );
@@ -152,7 +159,9 @@ final class Settings {
 			return new \WP_Error( 'wkc_greeting', __( 'Greeting message must be text.', 'wp-knowledge-chat' ) );
 		}
 		// Stored and rendered as plain text: markup is removed, never executed.
-		$text = trim( sanitize_textarea_field( wp_unslash( $value ) ) );
+		// No wp_unslash(): options.php already unslashes, and unslashing again
+		// strips legitimate backslashes from the greeting.
+		$text = trim( sanitize_textarea_field( $value ) );
 		if ( '' === $text ) {
 			return new \WP_Error( 'wkc_greeting', __( 'Greeting message is required.', 'wp-knowledge-chat' ) );
 		}

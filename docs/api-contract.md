@@ -44,7 +44,7 @@ Public (anonymous visitors). Same-origin only when an `Origin` header is present
 |---|---|---|
 | 400 | `wkc_invalid_message`, `wkc_message_too_long`, `rest_invalid_param`, `rest_missing_callback_param` | invalid input |
 | 403 | `wkc_forbidden_origin` | `Origin` is not this site (including `null`) |
-| 429 | `wkc_rate_limited` | more than 6 requests/min per visitor IP (sliding window; filterable) or backend limit |
+| 429 | `wkc_rate_limited` | more than 6 requests/min per visitor IP (sliding window; filterable) or backend limit; `Retry-After` header set (WordPress limit: 60 s; backend limit: passed through, at most one day) |
 | 503 | `wkc_unavailable` | chatbot disabled, backend not configured, backend error/timeout/invalid response |
 
 Response headers include `Cache-Control: no-store, private` and `X-Robots-Tag: noindex`.
@@ -70,7 +70,7 @@ Server-to-server only. Requires an HMAC signature from the WordPress plugin.
 **200 response**: `{ "answer": string, "sources": [{ "title", "url" }], "grounded": boolean }`
 
 - Sources are looked up from the knowledge base by the ids the model cites (max 3). A URL can never come from the model.
-- Fallback (no evidence, model declined, invalid or unsafe model output) → localised fallback text, `sources: []`, `grounded: false`.
+- Fallback (out of scope, no evidence, requested fact type absent from the evidence, model declined, provider safety block, invalid or unsafe model output, or a number/URL/e-mail/phone in the answer that the evidence does not contain) → localised fallback text, `sources: []`, `grounded: false`. The reason is logged (`chat_completed outcome=… reason=…`), not returned.
 
 **Errors**: `{ "error": { "code", "message" } }`
 
@@ -81,7 +81,7 @@ Server-to-server only. Requires an HMAC signature from the WordPress plugin.
 | 404 / 405 | `not_found` / `method_not_allowed` (`Allow` header set; CORS preflight is not supported) |
 | 413 | `payload_too_large` (> 8 KiB) |
 | 415 | `unsupported_media_type` |
-| 429 | `rate_limited`, `daily_limit_reached` (+ `Retry-After`) |
+| 429 | `rate_limited`, `daily_limit_reached` (+ `Retry-After`). The daily limit counts model calls only, so fallbacks answered without Gemini never return `daily_limit_reached`. |
 | 502 | `provider_unavailable` (provider error, auth failure, blocked output) |
 | 503 | `knowledge_base_unavailable` |
 | 504 | `provider_timeout` |
@@ -129,9 +129,11 @@ Validation is **all-or-nothing**: one invalid document → `422 invalid_document
 
 ## 4. Backend: `GET /api/health`
 
-Unauthenticated, minimal:
+Minimal status, for load balancers and uptime monitors:
 
 - `200 { "status": "ok", "knowledge_base": "ready" }`
 - `503 { "status": "degraded", "knowledge_base": "empty" }`
 
 There are no versions, counts, environment or configuration details.
+
+Without `X-WKC-*` headers the endpoint is unauthenticated. When `X-WKC-Signature` is present, the request is verified like `/api/chat` with an **empty body** (same timestamp window and replay cache), and a bad signature returns `401 unauthorized`. The WordPress **Test connection** button uses this, so a wrong shared secret or clock skew is reported instead of a false "ok".

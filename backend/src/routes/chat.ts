@@ -2,8 +2,8 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { SignatureVerifier } from '../lib/auth.js';
 import { HttpError, headerValue, isPlainObject, parseJson, readRawBody, requireJsonContentType, sendJson } from '../lib/http.js';
 import type { Logger } from '../lib/logger.js';
-import type { DailyBudget, FixedWindowLimiter } from '../middleware/rate-limit.js';
-import { LANGUAGES, type ChatService, type Language } from '../services/chat.js';
+import type { FixedWindowLimiter } from '../middleware/rate-limit.js';
+import { BudgetExceededError, LANGUAGES, type ChatService, type Language } from '../services/chat.js';
 import type { KnowledgeBaseStore } from '../services/knowledge-base.js';
 import { LlmError } from '../services/llm.js';
 
@@ -13,7 +13,6 @@ export interface ChatRouteDeps {
   verifier: SignatureVerifier;
   clientLimiter: FixedWindowLimiter;
   globalLimiter: FixedWindowLimiter;
-  dailyBudget: DailyBudget;
   chat: ChatService;
   store: KnowledgeBaseStore;
   logger: Logger;
@@ -79,18 +78,11 @@ export async function handleChat(req: IncomingMessage, res: ServerResponse, deps
     throw new HttpError(503, 'knowledge_base_unavailable', 'The assistant is not available right now.');
   }
 
-  const budget = deps.dailyBudget.consume();
-  if (!budget.allowed) {
-    deps.logger.warn('rate_limited', { scope: 'daily' });
-    throw new HttpError(429, 'daily_limit_reached', 'The assistant has reached its daily limit. Please try again tomorrow.', {
-      'Retry-After': String(budget.retryAfterSeconds),
-    });
-  }
-
   try {
     const result = await deps.chat.answer(message, language);
     deps.logger.info('chat_completed', {
       outcome: result.outcome,
+      reason: result.reason,
       language,
       message_chars: message.length,
       sources: result.sources.length,
@@ -98,6 +90,12 @@ export async function handleChat(req: IncomingMessage, res: ServerResponse, deps
     });
     sendJson(res, 200, { answer: result.answer, sources: result.sources, grounded: result.grounded });
   } catch (err) {
+    if (err instanceof BudgetExceededError) {
+      deps.logger.warn('rate_limited', { scope: 'daily' });
+      throw new HttpError(429, 'daily_limit_reached', 'The assistant has reached its daily limit. Please try again tomorrow.', {
+        'Retry-After': String(err.retryAfterSeconds),
+      });
+    }
     if (err instanceof LlmError) {
       deps.logger.error('llm_failed', { kind: err.kind, provider_status: err.providerStatus, latency_ms: Date.now() - started });
       if (err.kind === 'timeout') {

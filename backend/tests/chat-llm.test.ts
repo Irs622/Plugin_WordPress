@@ -36,7 +36,7 @@ describe('ChatService grounding', () => {
 
   it('falls back without calling the LLM when there is no evidence', async () => {
     const llm = new FakeLlm();
-    const result = await service(llm).answer('What is the weather in Paris?', 'id');
+    const result = await service(llm).answer('Do you sell bicycles in Paris?', 'id');
     assert.deepEqual(result, { answer: FALLBACK_MESSAGES.id, sources: [], grounded: false, outcome: 'no_evidence' });
     assert.equal(llm.calls.length, 0);
   });
@@ -180,6 +180,53 @@ describe('GeminiClient', () => {
       client(async () => new Response('<html>oops', { status: 200 })).generate({ systemInstruction: 's', userContent: 'u' }),
       (err: unknown) => err instanceof LlmError && err.kind === 'bad_response',
     );
+  });
+
+  it('enforces the deadline while reading a stalled response body', async () => {
+    // Headers arrive, then the body never completes. This double ignores the abort signal on purpose.
+    const stalled: FetchFn = async () =>
+      new Response(new ReadableStream({ start: (c) => c.enqueue(new TextEncoder().encode('{"candidates":')) }), { status: 200 });
+    const started = Date.now();
+    await assert.rejects(client(stalled, 1000).generate({ systemInstruction: 's', userContent: 'u' }), (err: unknown) => err instanceof LlmError && err.kind === 'timeout');
+    assert.ok(Date.now() - started < 2500, 'returns at the deadline, not when the provider gives up');
+  });
+
+  it('rejects oversized provider responses', async () => {
+    const huge = JSON.stringify({ candidates: [{ content: { parts: [{ text: 'x'.repeat(300 * 1024) }] } }] });
+    await assert.rejects(client(async () => new Response(huge, { status: 200 })).generate({ systemInstruction: 's', userContent: 'u' }), (err: unknown) => err instanceof LlmError && err.kind === 'bad_response');
+  });
+
+  it('maps Gemini invalid-key 400 responses to auth without retrying or exposing the payload', async () => {
+    let calls = 0;
+    const invalidKey = { error: { code: 400, message: `API key not valid: ${GEMINI_KEY}`, status: 'INVALID_ARGUMENT', details: [{ '@type': 'type.googleapis.com/google.rpc.ErrorInfo', reason: 'API_KEY_INVALID' }] } };
+    await assert.rejects(
+      client(async () => (calls++, jsonResponse(400, invalidKey))).generate({ systemInstruction: 's', userContent: 'u' }),
+      (err: unknown) => err instanceof LlmError && err.kind === 'auth' && err.providerStatus === 400 && !err.message.includes(GEMINI_KEY),
+    );
+    assert.equal(calls, 1);
+    await assert.rejects(
+      client(async () => jsonResponse(400, { error: { status: 'INVALID_ARGUMENT', message: 'bad schema' } })).generate({ systemInstruction: 's', userContent: 'u' }),
+      (err: unknown) => err instanceof LlmError && err.kind === 'bad_response',
+    );
+  });
+
+  it('classifies large error pages by status, not by size', async () => {
+    let calls = 0;
+    const page = '<html>' + 'x'.repeat(300 * 1024) + '</html>';
+    await assert.rejects(
+      client(async () => (calls++, new Response(page, { status: 503 }))).generate({ systemInstruction: 's', userContent: 'u' }),
+      (err: unknown) => err instanceof LlmError && err.kind === 'unavailable' && err.providerStatus === 503,
+    );
+    assert.equal(calls, 2, '503 stays retryable');
+  });
+
+  it('retries quota exhaustion (429) at most once', async () => {
+    let calls = 0;
+    await assert.rejects(
+      client(async () => (calls++, jsonResponse(429, { error: { status: 'RESOURCE_EXHAUSTED' } }))).generate({ systemInstruction: 's', userContent: 'u' }),
+      (err: unknown) => err instanceof LlmError && err.kind === 'rate_limited',
+    );
+    assert.equal(calls, 2);
   });
 
   it('maps network failures to unavailable', async () => {

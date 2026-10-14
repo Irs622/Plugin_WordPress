@@ -45,6 +45,53 @@ const RESPONSE_SCHEMA = {
 
 const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
 
+/** A grounded answer is well under 10 KiB; anything far larger is not a valid response. */
+const MAX_RESPONSE_BYTES = 256 * 1024;
+
+/**
+ * Reads a response body as text, failing once it exceeds `limit` bytes or
+ * when `signal` aborts (independently of whether the fetch implementation
+ * propagates the abort to the body stream).
+ */
+async function readLimited(response: Response, limit: number, signal: AbortSignal): Promise<string> {
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const cancel = () => void reader.cancel().catch(() => undefined);
+  signal.addEventListener('abort', cancel, { once: true });
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (signal.aborted) throw new LlmError('timeout');
+      if (done) break;
+      size += value.byteLength;
+      if (size > limit) {
+        cancel();
+        throw new LlmError('bad_response');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    signal.removeEventListener('abort', cancel);
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
+/**
+ * Gemini reports an invalid API key as HTTP 400 with reason API_KEY_INVALID
+ * rather than 401/403. Only that machine-readable reason is inspected; the
+ * error message (which can echo request content) is never logged.
+ */
+function isInvalidKeyError(body: string): boolean {
+  try {
+    const details = (JSON.parse(body) as { error?: { details?: { reason?: unknown }[] } })?.error?.details;
+    return Array.isArray(details) && details.some((d) => d?.reason === 'API_KEY_INVALID');
+  } catch {
+    return false;
+  }
+}
+
 export class GeminiClient implements LlmClient {
   private readonly fetchImpl: typeof fetch;
   private readonly sleep: (ms: number) => Promise<void>;
@@ -96,38 +143,56 @@ export class GeminiClient implements LlmClient {
     });
 
     const controller = new AbortController();
+    // The deadline covers the whole exchange, including reading the body: a
+    // provider that sends headers and then stalls must not hold the request.
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let response: Response;
     try {
-      response = await this.fetchImpl(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.options.apiKey },
-        body,
-        signal: controller.signal,
-      });
-    } catch (err) {
-      if (controller.signal.aborted) throw new LlmError('timeout');
-      throw new LlmError('unavailable');
+      let response: Response;
+      try {
+        response = await this.fetchImpl(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-goog-api-key': this.options.apiKey },
+          body,
+          signal: controller.signal,
+        });
+      } catch {
+        throw new LlmError(controller.signal.aborted ? 'timeout' : 'unavailable');
+      }
+
+      const read = async (limit: number): Promise<string> => {
+        try {
+          return await readLimited(response, limit, controller.signal);
+        } catch (err) {
+          if (controller.signal.aborted) throw new LlmError('timeout');
+          throw err instanceof LlmError ? err : new LlmError('unavailable', response.status);
+        }
+      };
+
+      if (!response.ok) {
+        // Provider error bodies can echo request content: only a 400 body is inspected (for the
+        // invalid-key reason), others are discarded unread. Nothing from them is logged.
+        if (response.status === 400) {
+          const errorBody = await read(16 * 1024).catch(() => '');
+          throw new LlmError(isInvalidKeyError(errorBody) ? 'auth' : 'bad_response', 400);
+        }
+        await response.body?.cancel().catch(() => undefined);
+        if (response.status === 429) throw new LlmError('rate_limited', 429);
+        if (response.status === 401 || response.status === 403) throw new LlmError('auth', response.status);
+        throw new LlmError('unavailable', response.status);
+      }
+
+      const text = await read(MAX_RESPONSE_BYTES);
+
+      let payload: unknown;
+      try {
+        payload = JSON.parse(text);
+      } catch {
+        throw new LlmError('bad_response');
+      }
+      return extractText(payload);
     } finally {
       clearTimeout(timer);
     }
-
-    if (!response.ok) {
-      // Drain without reading into logs: provider error bodies can echo request content.
-      await response.body?.cancel().catch(() => undefined);
-      if (response.status === 429) throw new LlmError('rate_limited', 429);
-      if (response.status === 401 || response.status === 403) throw new LlmError('auth', response.status);
-      if (response.status === 400) throw new LlmError('bad_response', 400);
-      throw new LlmError('unavailable', response.status);
-    }
-
-    let payload: unknown;
-    try {
-      payload = await response.json();
-    } catch {
-      throw new LlmError('bad_response');
-    }
-    return extractText(payload);
   }
 }
 

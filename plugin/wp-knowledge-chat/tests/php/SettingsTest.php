@@ -92,6 +92,28 @@ final class SettingsTest extends TestCase {
 		}
 	}
 
+	public function test_malformed_enabled_value_is_rejected_and_saved_value_kept(): void {
+		$this->assertTrue( Settings::get()['enabled'] );
+		foreach ( array( array( '1' ), 'maybe', 2, 1.5 ) as $malformed ) {
+			Settings::reset_reported_errors();
+			$GLOBALS['wp_settings_errors'] = array();
+			$this->assertTrue( Settings::sanitize( array( 'enabled' => $malformed ) + Settings::defaults() )['enabled'], var_export( $malformed, true ) );
+			$this->assertContains( 'wkc_enabled', $this->settings_error_codes() );
+		}
+		foreach ( array( '0', 'false', 'off', '', false ) as $off ) {
+			$this->assertFalse( Settings::sanitize( array( 'enabled' => $off ) )['enabled'], var_export( $off, true ) );
+		}
+	}
+
+	public function test_greeting_backslashes_survive_saving(): void {
+		// options.php has already unslashed $_POST when the sanitize callback runs.
+		$greeting = 'Paths like C:\\Data or a \\ are kept.';
+		$this->assertSame( $greeting, Settings::sanitize( array( 'enabled' => '1', 'greeting_message' => $greeting ) )['greeting_message'] );
+		update_option( Settings::OPTION, array( 'greeting_message' => $greeting ) + Settings::defaults() );
+		wp_cache_flush();
+		$this->assertSame( $greeting, Settings::get()['greeting_message'] );
+	}
+
 	public static function invalid_greetings(): array {
 		return array(
 			'empty'        => array( '' ),

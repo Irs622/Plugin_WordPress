@@ -24,6 +24,9 @@ final class Plugin {
 
 	public function boot(): void {
 		add_action( 'init', array( Settings::class, 'register' ) );
+		// While the stored value equals the registered default, update_option() takes the add_option() path.
+		add_action( 'add_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
+		add_action( 'update_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
 		add_action( 'rest_api_init', array( new Rest_Controller(), 'register_routes' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WP_KNOWLEDGE_CHAT_FILE ), array( $this, 'action_links' ) );
@@ -42,6 +45,16 @@ final class Plugin {
 	 */
 	public static function deactivate(): void {
 		wp_cache_delete( Settings::OPTION, 'options' );
+	}
+
+	/**
+	 * The greeting, language and contact URL are embedded in every page, and
+	 * the enabled flag decides whether the widget is printed at all, so cached
+	 * pages are stale after a settings change. Asks LiteSpeed Cache (when
+	 * active) to purge; the action is a no-op otherwise.
+	 */
+	public static function purge_page_cache(): void {
+		do_action( 'litespeed_purge_all' );
 	}
 
 	/**

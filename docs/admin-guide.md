@@ -19,14 +19,14 @@ WordPress dashboard → **WP Knowledge Chat** → **Settings**. Only administrat
 | **Enable Chatbot** | Turns the chat button on or off for the whole site | Untick it to switch the assistant off immediately |
 | **Greeting Message** | The first message visitors see when they open the chat | Plain text only, max 500 characters. Write it in the same language as *Default Language* |
 | **Default Language** | Language of the buttons and messages (English or Bahasa Indonesia), and the language the assistant answers in | Content on the website stays in its original language; service names are not translated |
-| **Contact URL** | Where "Contact the Inpartner team" links go | Use `https://inpartnerglobal.com/contact/`. Only https links on inpartnerglobal.com (or this site) are accepted |
+| **Contact URL** | Where "Contact the Inpartner team" links go | Default: the homepage, `https://inpartnerglobal.com`. Switching to a dedicated contact page (for example `/contact/`) needs the site owner's approval first. Only https links on inpartnerglobal.com (or this site) are accepted |
 
-Click **Save Changes**. If a value is not accepted, a red message explains why and the old value is kept. If the site uses a page cache (LiteSpeed Cache), **purge the cache** after saving so visitors see the change.
+Click **Save Changes**. If a value is not accepted, a red message explains why and the old value is kept. With LiteSpeed Cache, the page cache is purged automatically when settings change; with any other page cache, **purge it** after saving so visitors see the change.
 
 ### The "AI backend" box
 
 - **Configured** means the connection details have been added by the technical team.
-- **Test connection** checks that the AI service is running. Expected result: "backend is reachable and its knowledge base is ready".
+- **Test connection** checks that the AI service is running and accepts this site's shared secret. Expected result: "backend is reachable, the shared secret is accepted and the knowledge base is ready". "Rejected the shared secret" means the connection details in `wp-config.php` do not match the AI service.
 - If it says **Not configured** or the test fails, contact the technical team. The chat button stays hidden while it is not configured.
 
 ## Common tasks
@@ -57,6 +57,6 @@ Conversations are not saved on the website. They disappear when the visitor clos
 The assistant can only be as accurate as the website. These were found during setup (details in [knowledge-base.md](knowledge-base.md)):
 
 1. Contact page: remove the placeholder phone number **(406) 555-0120** and the sentence "Ready to take control of your financial future?…".
-2. The footer and the Contact page show **different phone numbers**. Keep one.
+2. The footer and the Contact page show **different phone numbers**. Keep one. Until you confirm the correct number, the assistant does not give out any phone number.
 3. The **Cross-Border M&A Advisory** page is empty, so the assistant cannot explain this service yet.
 4. Fix typos: "Start a Convertation", "Lear More", "Build for Companies".
