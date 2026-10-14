@@ -1,0 +1,61 @@
+{
+  "results": [
+    {
+      "name": "launcher does not overlap the primary navigation",
+      "ok": true
+    },
+    {
+      "name": "theme styles do not leak into widget controls (Hello Elementor / Elementor kit)",
+      "ok": true
+    },
+    {
+      "name": "keyboard: Tab reaches the launcher, Enter opens, focus moves to input",
+      "ok": true
+    },
+    {
+      "name": "open panel controls use widget styles, not theme styles",
+      "ok": true
+    },
+    {
+      "name": "answers a question with sources (grounded)",
+      "ok": true
+    },
+    {
+      "name": "unsupported question shows fallback with contact link",
+      "ok": true
+    },
+    {
+      "name": "provider failure shows an understandable, labelled error with retry",
+      "ok": true
+    },
+    {
+      "name": "axe-core: no WCAG 2.1 A/AA violations in the open widget",
+      "ok": true
+    },
+    {
+      "name": "Escape closes the panel and returns focus to the launcher",
+      "ok": true
+    },
+    {
+      "name": "conversation persists across page navigation in the session",
+      "ok": true
+    },
+    {
+      "name": "mobile: panel fits the viewport without horizontal scroll",
+      "ok": true
+    },
+    {
+      "name": "mobile: touch targets are at least 44px",
+      "ok": true
+    },
+    {
+      "name": "mobile: answer renders",
+      "ok": true
+    },
+    {
+      "name": "no JavaScript errors from the widget",
+      "ok": true
+    }
+  ],
+  "consoleErrors": []
+}

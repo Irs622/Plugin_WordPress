@@ -1,0 +1,79 @@
+{
+  "$comment": "Approved knowledge-base sources. Only pages listed under 'documents' are fetched and indexed. Review with the Inpartner team before every rebuild. Verified against the live site on 2026-10-14.",
+  "site": "https://inpartnerglobal.com",
+  "global_exclude_patterns": [
+    "^start a convertation$",
+    "^start a conversation$",
+    "^lear?n? more$",
+    "^read more$",
+    "^home$",
+    "^/$",
+    "^get direction$",
+    "^get started$",
+    "^connect with us$",
+    "^schedule a call$",
+    "^free consultation$",
+    "^view all insight$",
+    "^no content is added yet\\.?$",
+    "^our service$"
+  ],
+  "documents": [
+    {
+      "id": "page-196-home",
+      "wp_id": 196,
+      "category": "home",
+      "exclude_patterns": [
+        "^recent insight$",
+        "^financial insights and inspiration$",
+        "^insight$",
+        "^our clients$",
+        "MORA Stock",
+        "Rupiah Takes a Hit"
+      ],
+      "notes": "News teasers and the empty 'Our Clients' heading are removed: the linked posts are not approved sources."
+    },
+    {
+      "id": "page-223-about",
+      "wp_id": 223,
+      "category": "about"
+    },
+    {
+      "id": "page-628-cross-border-market-entry",
+      "wp_id": 628,
+      "category": "service"
+    },
+    {
+      "id": "page-918-distribution-partner-sourcing",
+      "wp_id": 918,
+      "category": "service"
+    },
+    {
+      "id": "page-1052-cross-border-ma",
+      "wp_id": 1052,
+      "category": "service",
+      "notes": "Page body was empty on 2026-10-14. The build skips empty pages; it will be indexed automatically once content is published."
+    },
+    {
+      "id": "page-445-contact",
+      "wp_id": 445,
+      "category": "contact",
+      "exclude_patterns": [
+        "\\(406\\) 555-0120",
+        "take control of your financial future"
+      ],
+      "notes": "Excluded lines look like theme placeholder text (a fictional 555 number). Confirm with Inpartner. The footer phone (+62 859-3454-8202) also differs from this page (+62 896 2831 0192)."
+    }
+  ],
+  "excluded": [
+    {
+      "wp_type": "posts",
+      "wp_id": 318,
+      "reason": "Stock-market commentary. Not approved: risk of being read as investment advice."
+    },
+    {
+      "wp_type": "posts",
+      "wp_id": 315,
+      "reason": "Currency-market commentary. Not approved: risk of being read as investment advice."
+    }
+  ]
+}

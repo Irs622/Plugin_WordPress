@@ -1,0 +1,27 @@
+{
+  "name": "wp-knowledge-chat-backend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI backend for WP Knowledge Chat (Inpartner AI Business Consultation Assistant).",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=20.11"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/server.js",
+    "start:local": "node --env-file=.env dist/src/server.js",
+    "test": "npm run build && node --test --test-reporter=spec dist/tests/*.test.js",
+    "kb:build": "npm run build && node dist/scripts/build-kb.js",
+    "kb:push": "npm run build && node dist/scripts/push-kb.js",
+    "eval:retrieval": "npm run build && node dist/eval/run-eval.js --mode=retrieval",
+    "eval:live": "npm run build && node dist/eval/run-eval.js --mode=live",
+    "secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
+    "mock:gemini": "node dist/scripts/mock-gemini.js 8790"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.6.0"
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "name": "inpartner/wp-knowledge-chat-tests",
+  "description": "Test tooling for the WP Knowledge Chat plugin (not shipped in the plugin ZIP).",
+  "type": "project",
+  "license": "GPL-2.0-or-later",
+  "require-dev": {
+    "phpcompatibility/phpcompatibility-wp": "*",
+    "phpunit/phpunit": "^11.5 || ^12.0",
+    "wp-coding-standards/wpcs": "^3.1"
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
+  },
+  "scripts": {
+    "test": "phpunit -c phpunit.xml.dist"
+  }
+}

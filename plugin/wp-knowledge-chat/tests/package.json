@@ -1,0 +1,14 @@
+{
+  "name": "wp-knowledge-chat-plugin-tests",
+  "private": true,
+  "description": "Widget and browser tests for the WP Knowledge Chat plugin (not shipped in the plugin ZIP).",
+  "type": "module",
+  "scripts": {
+    "test:widget": "node --test --test-reporter=spec js/*.test.js",
+    "test:browser": "node e2e/browser-check.mjs"
+  },
+  "devDependencies": {
+    "axe-core": "^4.10.0",
+    "jsdom": "^25.0.0"
+  }
+}

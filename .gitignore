@@ -1,0 +1,22 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build output
+node_modules/
+backend/dist/
+plugin/wp-knowledge-chat/tests/vendor/
+plugin/wp-knowledge-chat/tests/.phpunit.cache/
+dist/
+
+# Local disposable WordPress installs used by tests
+.wp-test/
+.wp-zip-test/
+
+# Live evaluation reports may contain provider output; review before committing
+backend/eval/report-live-*.json
+
+# OS / editor
+.DS_Store
+*.log

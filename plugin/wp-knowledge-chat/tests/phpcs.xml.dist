@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<ruleset name="WP Knowledge Chat">
+	<description>Security-focused WordPress sniffs and PHP compatibility for the shipped plugin code.</description>
+	<file>../wp-knowledge-chat.php</file>
+	<file>../uninstall.php</file>
+	<file>../includes</file>
+	<arg name="extensions" value="php"/>
+	<arg value="sp"/>
+
+	<!-- Escaping, nonce verification, input sanitization, prepared SQL, safe redirects. -->
+	<rule ref="WordPress.Security"/>
+	<rule ref="WordPress.DB.PreparedSQL"/>
+	<rule ref="WordPress.DB.PreparedSQLPlaceholders"/>
+	<rule ref="WordPress.WP.I18n"/>
+	<rule ref="WordPress.WP.AlternativeFunctions"/>
+	<rule ref="WordPress.PHP.DontExtract"/>
+	<rule ref="WordPress.PHP.RestrictedPHPFunctions"/>
+	<rule ref="WordPress.PHP.DiscouragedPHPFunctions"/>
+	<rule ref="WordPress.PHP.StrictInArray"/>
+	<rule ref="Generic.PHP.BacktickOperator"/>
+
+	<config name="text_domain" value="wp-knowledge-chat"/>
+	<config name="minimum_wp_version" value="6.4"/>
+	<config name="testVersion" value="8.1-"/>
+	<rule ref="PHPCompatibilityWP"/>
+</ruleset>
