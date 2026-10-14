@@ -4,7 +4,12 @@ All notable changes to this project are documented here. The format follows [Kee
 
 ## [Unreleased]
 
+### Changed
+- Backend `package.json` license set to `GPL-2.0-or-later` to match the plugin.
+
 ### Added
+- `LICENSE` (GPL-2.0-or-later), `CONTRIBUTING.md`, `SECURITY.md` and `docs/tech-stack.md` (technologies, versions, rationale).
+- Rewritten `README.md` with table of contents, tech stack, test results, documentation index, license and author.
 - Complete documentation set: plugin `readme.txt` (installation, configuration, FAQ, filters, privacy, uninstall), backend README, plugin test README, admin guide, evaluation guide and this changelog.
 
 ## [0.1.0] - 2026-10-14

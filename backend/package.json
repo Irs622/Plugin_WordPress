@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "AI backend for WP Knowledge Chat (Inpartner AI Business Consultation Assistant).",
-  "license": "UNLICENSED",
+  "license": "GPL-2.0-or-later",
   "type": "module",
   "engines": {
     "node": ">=20.11"
