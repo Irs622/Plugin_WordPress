@@ -27,7 +27,7 @@ Not covered by the local environment: MySQL, LiteSpeed/Apache rewrite and cache 
 | End-to-end HTTP (real WP + real backend + mock Gemini) | widget on Elementor page, no secrets/backend URL in HTML, grounded answer with real KB sources, fallback, origin/input rejection, provider error/timeout → friendly 503, 7th request → 429, subscriber/editor/anonymous blocked, bad nonce → 403, settings persist, invalid values rejected with messages, disable/enable, connection test | **12 / 12 passed** |
 | Headless Chrome (desktop 1366×900, mobile 390×844) | no overlap with header nav, Hello Elementor styles do not leak in (computed colours, hover), Tab/Enter/Escape keyboard flow with visible focus, answer + sources (`_blank`, `noopener noreferrer`), fallback, labelled error + retry, **axe-core WCAG 2.1 A/AA: 0 violations**, session persistence, mobile full-width sheet without horizontal scroll, chips wrap, ≥16 px input, touch targets, no JS errors | **14 / 14 passed**; screenshots in `docs/screenshots/` |
 | Log review | `debug.log` plugin entries; secrets in backend/PHP/mock logs | none found |
-| Package | ZIP built, installed via WP-CLI into a **fresh** WP 7.1.3, activated, defaults created, deactivated, uninstalled (option removed), reinstalled | passed; `wp-knowledge-chat-0.1.0.zip` sha256 `d4c7f05a…cfea` |
+| Package | ZIP built, installed via WP-CLI into a **fresh** WP 7.1.3, activated, defaults created, deactivated, uninstalled (option removed), reinstalled | passed (tested build sha256 `d4c7f05a…cfea`; rebuilt afterwards with a documentation-only change to `readme.txt`, current sha256 `b1cc4cf7…cc9d`) |
 
 ### Issues found and fixed during testing
 

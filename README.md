@@ -15,7 +15,8 @@ Browser widget ──▶ WordPress REST proxy ──(HMAC-signed)──▶ Node 
 | Plugin ZIP | `dist/wp-knowledge-chat-0.1.0.zip` (build: `scripts/package-plugin.sh`) |
 | Plugin source | [plugin/wp-knowledge-chat/](plugin/wp-knowledge-chat/) |
 | Backend source | [backend/](backend/) |
-| Docs | [architecture](docs/architecture.md) · [API contract](docs/api-contract.md) · [security](docs/security.md) · [deployment & rollback](docs/deployment.md) · [knowledge base](docs/knowledge-base.md) · [test report](docs/test-report.md) |
+| Docs | [architecture](docs/architecture.md) · [API contract](docs/api-contract.md) · [security](docs/security.md) · [deployment & rollback](docs/deployment.md) · [knowledge base](docs/knowledge-base.md) · [evaluation](docs/evaluation.md) · [test report](docs/test-report.md) · [changelog](CHANGELOG.md) |
+| Guides | [admin guide](docs/admin-guide.md) (site administrators) · [backend README](backend/README.md) · [plugin readme.txt](plugin/wp-knowledge-chat/readme.txt) · [plugin tests README](plugin/wp-knowledge-chat/tests/README.md) |
 | Screenshots | [docs/screenshots/](docs/screenshots/) (Hello Elementor + Elementor, desktop and mobile) |
 
 ## Features
