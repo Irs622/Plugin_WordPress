@@ -175,7 +175,8 @@
 	opacity: 0.92;
 }
 
-#wkc-root .wkc-close {
+#wkc-root .wkc-close,
+#wkc-root .wkc-clear {
 	flex: none;
 	width: 36px;
 	height: 36px;
@@ -184,16 +185,19 @@
 	border-radius: 8px;
 	background: transparent;
 	color: var(--wkc-brand-contrast);
-	font-size: 22px;
+	font-size: 20px;
 	line-height: 1;
 	cursor: pointer;
+	margin-left: 4px;
 }
 
-#wkc-root .wkc-close:hover {
+#wkc-root .wkc-close:hover,
+#wkc-root .wkc-clear:hover {
 	background: rgba(255, 255, 255, 0.12);
 }
 
 #wkc-root .wkc-close:focus-visible,
+#wkc-root .wkc-clear:focus-visible,
 #wkc-root .wkc-launcher:focus-visible,
 #wkc-root .wkc-lang:focus-visible {
 	outline-color: var(--wkc-accent);
@@ -518,6 +522,107 @@
 	display: inline-block;
 	margin-bottom: 4px;
 	font-size: 13.5px;
+}
+
+#wkc-root .wkc-bullet-list {
+	margin: 6px 0;
+	padding-left: 20px;
+	list-style: disc;
+}
+
+#wkc-root .wkc-bullet-list li {
+	margin: 3px 0;
+}
+
+#wkc-root .wkc-lead-trigger {
+	margin-top: 8px;
+}
+
+#wkc-root .wkc-lead-btn {
+	background: var(--wkc-brand);
+	color: #ffffff;
+	font-size: 13px;
+	font-weight: 600;
+	padding: 7px 13px;
+	border-radius: 6px;
+	cursor: pointer;
+	border: 1px solid transparent;
+}
+
+#wkc-root .wkc-lead-btn:hover {
+	background: #094747;
+}
+
+#wkc-root .wkc-lead-card {
+	background: #ffffff;
+	border: 1px solid var(--wkc-border);
+	border-radius: 8px;
+	padding: 12px;
+	margin-top: 10px;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+#wkc-root .wkc-lead-title {
+	font-weight: 700;
+	font-size: 13.5px;
+	margin-bottom: 8px;
+	color: var(--wkc-ink);
+}
+
+#wkc-root .wkc-lead-input,
+#wkc-root .wkc-lead-textarea {
+	display: block;
+	width: 100%;
+	padding: 7px 10px;
+	margin-bottom: 8px;
+	border: 1px solid var(--wkc-border);
+	border-radius: 6px;
+	font-size: 13px;
+	background: #fbfbfb;
+	color: var(--wkc-text);
+	box-sizing: border-box;
+}
+
+#wkc-root .wkc-lead-input:focus,
+#wkc-root .wkc-lead-textarea:focus {
+	border-color: var(--wkc-brand);
+	background: #ffffff;
+	outline: none;
+}
+
+#wkc-root .wkc-lead-error {
+	color: var(--wkc-error);
+	font-size: 12px;
+	margin-bottom: 6px;
+}
+
+#wkc-root .wkc-lead-actions {
+	display: flex;
+	gap: 8px;
+	justify-content: flex-end;
+}
+
+#wkc-root .wkc-lead-submit {
+	background: var(--wkc-brand);
+	color: #ffffff;
+	font-size: 12.5px;
+	font-weight: 600;
+	padding: 6px 14px;
+	border-radius: 6px;
+	cursor: pointer;
+}
+
+#wkc-root .wkc-lead-submit:hover {
+	background: #094747;
+}
+
+#wkc-root .wkc-lead-cancel {
+	background: #f0f0f1;
+	color: var(--wkc-text);
+	font-size: 12.5px;
+	padding: 6px 12px;
+	border-radius: 6px;
+	cursor: pointer;
 }
 
 /* Mobile: panel becomes a bottom sheet across the full width. */

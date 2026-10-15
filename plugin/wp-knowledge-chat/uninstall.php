@@ -8,6 +8,8 @@
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
 delete_option( 'wp_knowledge_chat_settings' );
+delete_option( 'wkc_metrics' );
+delete_option( 'wkc_leads' );
 
 // Rate-limit and connection-test transients expire within minutes; remove any left over.
 global $wpdb;

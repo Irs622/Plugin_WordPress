@@ -1,12 +1,11 @@
-# Netlify configuration for WP Knowledge Chat AI Backend
-
 [build]
   command = "cd backend && npm run build"
-  publish = "dist"
+  publish = "backend/dist"
 
 [functions]
   directory = "backend/dist/src/netlify"
   node_bundler = "esbuild"
+  included_files = ["backend/data/kb.json", "data/kb.json"]
 
 [[redirects]]
   from = "/api/*"

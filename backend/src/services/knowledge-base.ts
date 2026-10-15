@@ -276,7 +276,22 @@ export async function readKnowledgeBaseFile(path: string): Promise<unknown> {
       // Fall through to requested path
     }
   }
-  return JSON.parse(await readFile(path, 'utf8'));
+  const candidatePaths = [
+    path,
+    join(process.cwd(), path),
+    join(process.cwd(), 'backend', path),
+    join(process.cwd(), 'data/kb.json'),
+    join(process.cwd(), 'backend/data/kb.json'),
+  ];
+  let lastError: unknown;
+  for (const candidate of candidatePaths) {
+    try {
+      return JSON.parse(await readFile(candidate, 'utf8'));
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 async function writeAtomic(path: string, data: KnowledgeBaseFile): Promise<void> {

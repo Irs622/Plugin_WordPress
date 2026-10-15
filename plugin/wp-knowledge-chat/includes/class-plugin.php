@@ -29,6 +29,7 @@ final class Plugin {
 		add_action( 'add_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
 		add_action( 'update_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
 		add_action( 'rest_api_init', array( new Rest_Controller(), 'register_routes' ) );
+		add_action( 'transition_post_status', array( Content_Sync::class, 'on_post_status_transition' ), 10, 3 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WP_KNOWLEDGE_CHAT_FILE ), array( $this, 'action_links' ) );
 

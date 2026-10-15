@@ -82,6 +82,33 @@ final class Content_Sync {
 	}
 
 	/**
+	 * Resolves raw or builder-rendered content for a post.
+	 */
+	public static function get_raw_post_content( \WP_Post $post ): string {
+		$content = $post->post_content;
+
+		// Elementor builder compatibility: if built with Elementor, fetch rendered content.
+		if ( class_exists( '\Elementor\Plugin' ) && isset( \Elementor\Plugin::$instance->db ) && \Elementor\Plugin::$instance->db->is_built_with_elementor( $post->ID ) ) {
+			if ( isset( \Elementor\Plugin::$instance->frontend ) && method_exists( \Elementor\Plugin::$instance->frontend, 'get_builder_content_for_display' ) ) {
+				$builder_content = \Elementor\Plugin::$instance->frontend->get_builder_content_for_display( $post->ID, false );
+				if ( is_string( $builder_content ) && '' !== trim( $builder_content ) ) {
+					$content = $builder_content;
+				}
+			}
+		}
+
+		// Expand shortcodes if present.
+		if ( false !== strpos( $content, '[' ) && function_exists( 'do_shortcode' ) ) {
+			$expanded = do_shortcode( $content );
+			if ( is_string( $expanded ) && '' !== trim( $expanded ) ) {
+				$content = $expanded;
+			}
+		}
+
+		return $content;
+	}
+
+	/**
 	 * Converts a single WordPress Post/Page into a KnowledgeDocument array.
 	 * Returns null if the page is not published, has no body text, or is invalid.
 	 *
@@ -92,7 +119,7 @@ final class Content_Sync {
 			return null;
 		}
 
-		$text = self::clean_html( $post->post_content );
+		$text = self::clean_html( self::get_raw_post_content( $post ) );
 		if ( mb_strlen( $text ) < self::MIN_DOCUMENT_CHARS ) {
 			return null;
 		}
@@ -156,7 +183,7 @@ final class Content_Sync {
 			if ( ! $page instanceof \WP_Post ) {
 				continue;
 			}
-			$clean_text = self::clean_html( $page->post_content );
+			$clean_text = self::clean_html( self::get_raw_post_content( $page ) );
 			$char_count = mb_strlen( $clean_text );
 			$result[]   = array(
 				'id'         => $page->ID,
@@ -265,6 +292,35 @@ final class Content_Sync {
 				'total'     => $total,
 			),
 		);
+	}
+
+	/**
+	 * Automatically synchronizes a page to the AI backend when published, updated, or unpublished.
+	 */
+	public static function on_post_status_transition( string $new_status, string $old_status, \WP_Post $post ): void {
+		if ( 'page' !== $post->post_type || wp_is_post_autosave( $post ) || wp_is_post_revision( $post ) ) {
+			return;
+		}
+
+		if ( ! Backend_Client::is_index_configured() ) {
+			return;
+		}
+
+		$title = wp_strip_all_tags( get_the_title( $post ) );
+		$slug  = sanitize_title( $post->post_name ?: $title );
+		if ( '' === $slug ) {
+			$slug = (string) $post->ID;
+		}
+		$doc_id = 'page-' . $post->ID . '-' . $slug;
+
+		if ( 'publish' === $new_status ) {
+			$doc = self::extract_document( $post );
+			if ( null !== $doc ) {
+				Backend_Client::index( array( $doc ) );
+			}
+		} elseif ( 'publish' === $old_status && 'publish' !== $new_status ) {
+			Backend_Client::index( array(), array( $doc_id ) );
+		}
 	}
 }
 

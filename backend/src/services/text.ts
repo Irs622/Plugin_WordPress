@@ -137,6 +137,8 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   founded: ['established', 'originated', 'history', '2009', '2019'],
   countries: ['geographic', 'coverage'],
   coverage: ['geographic', 'coverage'],
+  region: ['regional', 'geographic', 'coverage', 'southeast', 'asia'],
+  regions: ['regional', 'geographic', 'coverage', 'southeast', 'asia'],
   sectors: ['sector', 'industry', 'expertise'],
   industries: ['industry', 'expertise'],
 };

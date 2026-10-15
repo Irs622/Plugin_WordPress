@@ -25,6 +25,7 @@ define( 'WP_KNOWLEDGE_CHAT_URL', plugin_dir_url( __FILE__ ) );
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-settings.php';
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-backend-client.php';
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-content-sync.php';
+require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-analytics.php';
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-rest-controller.php';
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-admin-page.php';
 require_once WP_KNOWLEDGE_CHAT_DIR . 'includes/class-plugin.php';

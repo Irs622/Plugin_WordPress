@@ -17,6 +17,7 @@ final class Admin_Page {
 
 	public const SLUG          = 'wp-knowledge-chat';
 	public const SYNC_SLUG     = 'wp-knowledge-chat-sync';
+	public const LEADS_SLUG    = 'wp-knowledge-chat-leads';
 	public const CAPABILITY    = 'manage_options';
 	public const HEALTH_ACTION = 'wkc_test_connection';
 	public const SYNC_ACTION   = 'wkc_sync_kb';
@@ -54,6 +55,14 @@ final class Admin_Page {
 			self::CAPABILITY,
 			self::SYNC_SLUG,
 			array( $this, 'render_sync_page' )
+		);
+		add_submenu_page(
+			self::SLUG,
+			__( 'Analytics & Consultation Leads', 'wp-knowledge-chat' ),
+			__( 'Analytics & Leads', 'wp-knowledge-chat' ),
+			self::CAPABILITY,
+			self::LEADS_SLUG,
+			array( $this, 'render_leads_page' )
 		);
 	}
 
@@ -457,5 +466,117 @@ final class Admin_Page {
 
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SYNC_SLUG ) );
 		exit;
+	}
+
+	/**
+	 * Renders the Analytics & Leads dashboard.
+	 */
+	public function render_leads_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-knowledge-chat' ), 403 );
+		}
+
+		$metrics      = Analytics::get_metrics();
+		$leads        = Analytics::get_leads();
+		$total        = $metrics['total_queries'];
+		$grounded     = $metrics['grounded_queries'];
+		$fallback     = $metrics['fallback_queries'];
+		$answered_pct = $total > 0 ? (int) round( ( $grounded / $total ) * 100 ) : 0;
+		$fallback_pct = $total > 0 ? (int) round( ( $fallback / $total ) * 100 ) : 0;
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Analytics & Consultation Leads', 'wp-knowledge-chat' ); ?></h1>
+			<p class="description">
+				<?php esc_html_e( 'Monitor chatbot engagement, question trends, and visitor consultation requests. Zero personal data or visitor IPs are collected for queries.', 'wp-knowledge-chat' ); ?>
+			</p>
+
+			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0;">
+				<div class="card" style="margin:0;padding:16px;">
+					<h3 style="margin-top:0;color:#50575e;"><?php esc_html_e( 'Total Conversations', 'wp-knowledge-chat' ); ?></h3>
+					<div style="font-size:28px;font-weight:700;color:#1d2327;"><?php echo (int) $total; ?></div>
+					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Total questions asked by visitors', 'wp-knowledge-chat' ); ?></p>
+				</div>
+				<div class="card" style="margin:0;padding:16px;">
+					<h3 style="margin-top:0;color:#007017;"><?php esc_html_e( 'Answered from Knowledge', 'wp-knowledge-chat' ); ?></h3>
+					<div style="font-size:28px;font-weight:700;color:#007017;"><?php echo (int) $grounded; ?> <span style="font-size:16px;font-weight:400;">(<?php echo (int) $answered_pct; ?>%)</span></div>
+					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Supported by official website sources', 'wp-knowledge-chat' ); ?></p>
+				</div>
+				<div class="card" style="margin:0;padding:16px;">
+					<h3 style="margin-top:0;color:#b32d2e;"><?php esc_html_e( 'Consultation Fallbacks', 'wp-knowledge-chat' ); ?></h3>
+					<div style="font-size:28px;font-weight:700;color:#b32d2e;"><?php echo (int) $fallback; ?> <span style="font-size:16px;font-weight:400;">(<?php echo (int) $fallback_pct; ?>%)</span></div>
+					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Directed to consultation / contact link', 'wp-knowledge-chat' ); ?></p>
+				</div>
+				<div class="card" style="margin:0;padding:16px;">
+					<h3 style="margin-top:0;color:#2271b1;"><?php esc_html_e( 'Captured Leads', 'wp-knowledge-chat' ); ?></h3>
+					<div style="font-size:28px;font-weight:700;color:#2271b1;"><?php echo count( $leads ); ?></div>
+					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Prospective clients requesting consultation', 'wp-knowledge-chat' ); ?></p>
+				</div>
+			</div>
+
+			<h2><?php esc_html_e( 'Captured Consultation Leads', 'wp-knowledge-chat' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped" style="margin-bottom:30px;">
+				<thead>
+					<tr>
+						<th scope="col" style="width:160px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:160px;"><?php esc_html_e( 'Name', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:200px;"><?php esc_html_e( 'Email', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:180px;"><?php esc_html_e( 'Company', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col"><?php esc_html_e( 'Inquiry Message', 'wp-knowledge-chat' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php if ( empty( $leads ) ) : ?>
+						<tr>
+							<td colspan="5"><?php esc_html_e( 'No leads captured yet. Prospective clients who request consultation via the chat widget will appear here.', 'wp-knowledge-chat' ); ?></td>
+						</tr>
+					<?php else : ?>
+						<?php foreach ( $leads as $lead ) : ?>
+							<tr>
+								<td><?php echo esc_html( $lead['created_at'] ); ?></td>
+								<td><strong><?php echo esc_html( $lead['name'] ); ?></strong></td>
+								<td><a href="mailto:<?php echo esc_attr( $lead['email'] ); ?>"><?php echo esc_html( $lead['email'] ); ?></a></td>
+								<td><?php echo esc_html( $lead['company'] ?: '—' ); ?></td>
+								<td><?php echo esc_html( $lead['message'] ?: '—' ); ?></td>
+							</tr>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</tbody>
+			</table>
+
+			<h2><?php esc_html_e( 'Recent Visitor Questions (Privacy-Safe Snippets)', 'wp-knowledge-chat' ); ?></h2>
+			<table class="wp-list-table widefat fixed striped">
+				<thead>
+					<tr>
+						<th scope="col" style="width:160px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col"><?php esc_html_e( 'Question', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:100px;"><?php esc_html_e( 'Language', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:140px;"><?php esc_html_e( 'Outcome', 'wp-knowledge-chat' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php if ( empty( $metrics['recent_queries'] ) ) : ?>
+						<tr>
+							<td colspan="4"><?php esc_html_e( 'No questions recorded yet.', 'wp-knowledge-chat' ); ?></td>
+						</tr>
+					<?php else : ?>
+						<?php foreach ( $metrics['recent_queries'] as $q ) : ?>
+							<tr>
+								<td><?php echo esc_html( $q['time'] ); ?></td>
+								<td><?php echo esc_html( $q['question'] ); ?></td>
+								<td><span class="badge" style="background:#f0f0f1;padding:2px 8px;border-radius:3px;font-size:12px;"><?php echo esc_html( strtoupper( $q['language'] ) ); ?></span></td>
+								<td>
+									<?php if ( ! empty( $q['grounded'] ) ) : ?>
+										<span style="color:#007017;font-weight:600;"><?php esc_html_e( 'Grounded', 'wp-knowledge-chat' ); ?></span>
+									<?php else : ?>
+										<span style="color:#b32d2e;font-weight:600;"><?php esc_html_e( 'Fallback', 'wp-knowledge-chat' ); ?></span>
+									<?php endif; ?>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					<?php endif; ?>
+				</tbody>
+			</table>
+		</div>
+		<?php
 	}
 }

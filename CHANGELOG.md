@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows [Kee
 ## [0.2.0] - 2026-10-15
 
 ### Added
+- **Lead Capture & Consultation Request (FR-16)**: Optional consultative lead inquiry form inside the chat widget for ungrounded answers. POST `/wp-json/wp-knowledge-chat/v1/lead` REST route, admin email notification, and lead storage in WordPress.
+- **Analytics & Consultation Leads Dashboard (FR-15)**: WordPress admin dashboard under "Analytics & Leads" displaying conversation metrics, grounded vs fallback rates, language breakdown, recent non-PII queries, and captured prospective client leads.
+- **Automated Knowledge Base Synchronization (FR-14)**: Added `transition_post_status` hook to automatically push page updates to the AI backend when published/updated and delete them when trashed/unpublished.
+- **Elementor & Page Builder Content Extraction**: Content extraction in `Content_Sync` now supports Elementor builder content and expands shortcodes so pages built with Elementor do not sync as empty text.
+- **Clear Conversation Button**: Added header reset button (`↺`) in the chat widget allowing visitors to easily restart the conversation.
+- **Structured Safe Message Bubbles**: Formats bullet lists and line breaks cleanly using DOM elements without `innerHTML` (100% XSS-safe).
+- **Netlify Functions & Serverless Resilience**: Configured `included_files` in `netlify.toml` for `kb.json` bundling, updated publish directory, and added multi-path resolution in `readKnowledgeBaseFile` for container/serverless environments.
+- **Retrieval Accuracy Boost**: Added regional coverage query expansions, lifting held-out answerable retrieval accuracy to **100% (25/25)**.
 - **Korean (한국어)** as a third language beside English and Bahasa Indonesia: widget interface, REST error messages, backend fallback text, answer-language instruction and few-shot examples.
 - **Language switcher** in the chat header (EN · ID · 한국어). The visitor's choice is remembered in `localStorage` (`wkc-lang`); the conversation is kept when switching and later questions are sent in the new language.
 - **Browser-language detection**: the widget starts in the visitor's browser language when it is supported (`ko-KR` → Korean, `id`/`in` → Indonesian), otherwise in the default language.

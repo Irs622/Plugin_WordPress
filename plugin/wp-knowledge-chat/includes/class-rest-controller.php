@@ -50,6 +50,34 @@ final class Rest_Controller {
 				),
 			)
 		);
+
+		register_rest_route(
+			self::NAMESPACE,
+			'/lead',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array( $this, 'handle_lead' ),
+				'permission_callback' => '__return_true',
+				'args'                => array(
+					'name'    => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+					'email'   => array(
+						'type'     => 'string',
+						'required' => true,
+					),
+					'company' => array(
+						'type'     => 'string',
+						'required' => false,
+					),
+					'message' => array(
+						'type'     => 'string',
+						'required' => false,
+					),
+				),
+			)
+		);
 	}
 
 	/**
@@ -132,10 +160,67 @@ final class Rest_Controller {
 			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
 		}
 
+		Analytics::record_query( $message, $language, $clean['grounded'], $clean['grounded'] ? 'answered' : 'fallback' );
+
 		$response = new \WP_REST_Response( $clean, 200 );
 		$response->header( 'Cache-Control', 'no-store, private' );
 		$response->header( 'X-Robots-Tag', 'noindex' );
 		return $response;
+	}
+
+	/**
+	 * Handles voluntary lead submissions from visitors requesting consultation.
+	 *
+	 * @return \WP_REST_Response|\WP_Error
+	 */
+	public function handle_lead( \WP_REST_Request $request ) {
+		$settings = Settings::get();
+		$language = $settings['language'];
+
+		if ( ! $settings['enabled'] ) {
+			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
+		}
+
+		if ( ! $this->origin_allowed( $request->get_header( 'origin' ) ) ) {
+			return $this->error( 'wkc_forbidden_origin', 'forbidden', $language, 403 );
+		}
+
+		$client_ip = $this->client_ip();
+		if ( ! $this->rate_limit_allows( $client_ip ) ) {
+			return $this->rate_limited( $language, 60 );
+		}
+
+		$name    = trim( sanitize_text_field( (string) $request->get_param( 'name' ) ) );
+		$email   = trim( sanitize_email( (string) $request->get_param( 'email' ) ) );
+		$company = trim( sanitize_text_field( (string) $request->get_param( 'company' ) ) );
+		$message = trim( sanitize_textarea_field( (string) $request->get_param( 'message' ) ) );
+
+		if ( '' === $name || ! is_email( $email ) ) {
+			return new \WP_REST_Response(
+				array(
+					'success' => false,
+					'message' => __( 'Please provide a valid name and email address.', 'wp-knowledge-chat' ),
+				),
+				400
+			);
+		}
+
+		Analytics::save_lead(
+			array(
+				'name'    => $name,
+				'email'   => $email,
+				'company' => $company,
+				'message' => $message,
+			)
+		);
+
+		return new \WP_REST_Response(
+			array(
+				'success' => true,
+				'message' => __( 'Thank you! Your consultation request has been sent to the Inpartner team.', 'wp-knowledge-chat' ),
+			),
+			200
+		);
 	}
 
 	/**

@@ -42,7 +42,17 @@
 			errTimeout: 'The assistant is taking too long to respond. Please try again.',
 			errRate: 'You are sending messages too quickly. Please wait a minute and try again.',
 			errGeneric: 'The assistant is unavailable right now. Please try again later or contact us directly.',
-			counter: '{n} of {max} characters'
+			counter: '{n} of {max} characters',
+			clear: 'Clear chat',
+			requestConsult: 'Request Consultation',
+			leadName: 'Your Name',
+			leadEmail: 'Work Email',
+			leadCompany: 'Company (Optional)',
+			leadMessage: 'Consultation Inquiry',
+			leadSubmit: 'Send Request',
+			leadCancel: 'Cancel',
+			leadSuccess: 'Thank you! Your consultation request has been sent to the Inpartner team.',
+			leadError: 'Please provide a valid name and email address.'
 		},
 		id: {
 			title: 'Asisten AI Inpartner',
@@ -71,7 +81,17 @@
 			errTimeout: 'Asisten terlalu lama merespons. Silakan coba lagi.',
 			errRate: 'Anda mengirim pesan terlalu cepat. Silakan tunggu sebentar lalu coba lagi.',
 			errGeneric: 'Asisten sedang tidak tersedia. Silakan coba lagi nanti atau hubungi kami secara langsung.',
-			counter: '{n} dari {max} karakter'
+			counter: '{n} dari {max} karakter',
+			clear: 'Hapus obrolan',
+			requestConsult: 'Minta Konsultasi',
+			leadName: 'Nama Anda',
+			leadEmail: 'Email Kerja',
+			leadCompany: 'Perusahaan (Opsional)',
+			leadMessage: 'Kebutuhan Konsultasi',
+			leadSubmit: 'Kirim Permintaan',
+			leadCancel: 'Batal',
+			leadSuccess: 'Terima kasih! Permintaan konsultasi Anda telah dikirim ke tim Inpartner.',
+			leadError: 'Silakan isi nama dan alamat email yang valid.'
 		},
 		ko: {
 			title: 'Inpartner AI 어시스턴트',
@@ -100,7 +120,17 @@
 			errTimeout: '어시스턴트의 응답이 너무 늦어지고 있습니다. 다시 시도해 주세요.',
 			errRate: '메시지를 너무 빠르게 보내고 있습니다. 잠시 후 다시 시도해 주세요.',
 			errGeneric: '지금은 어시스턴트를 이용할 수 없습니다. 잠시 후 다시 시도하시거나 직접 문의해 주세요.',
-			counter: '{n} / {max}자'
+			counter: '{n} / {max}자',
+			clear: '대화 지우기',
+			requestConsult: '상담 요청하기',
+			leadName: '성함',
+			leadEmail: '이메일',
+			leadCompany: '회사명 (선택)',
+			leadMessage: '상담 문의 내용',
+			leadSubmit: '요청 보내기',
+			leadCancel: '취소',
+			leadSuccess: '감사합니다! Inpartner 자문팀으로 상담 요청이 전송되었습니다.',
+			leadError: '올바른 성함과 이메일 주소를 입력해 주세요.'
 		}
 	};
 
@@ -247,6 +277,21 @@
 			});
 			header.appendChild(switcher);
 		}
+
+		var clearBtn = el('button', { type: 'button', class: 'wkc-clear', 'aria-label': t.clear, title: t.clear });
+		clearBtn.appendChild(el('span', { 'aria-hidden': 'true' }, '↺'));
+		clearBtn.addEventListener('click', function () {
+			history = [];
+			persist();
+			while (log.firstChild) log.removeChild(log.firstChild);
+			renderGreeting();
+			renderSuggestions();
+			input.value = '';
+			updateCounter();
+			formError.textContent = '';
+			input.focus();
+		});
+		header.appendChild(clearBtn);
 		header.appendChild(closeBtn);
 
 		var log = el('div', { class: 'wkc-log', role: 'log', 'aria-live': 'polite', 'aria-relevant': 'additions', 'aria-label': t.title, tabindex: '0' });
@@ -314,12 +359,105 @@
 			return a;
 		}
 
+		function renderLeadForm(parentItem) {
+			if (parentItem.querySelector('.wkc-lead-card')) return;
+			var card = el('div', { class: 'wkc-lead-card' });
+			var formTitle = el('p', { class: 'wkc-lead-title' }, t.requestConsult);
+			card.appendChild(formTitle);
+
+			var nameInput = el('input', { type: 'text', class: 'wkc-lead-input', placeholder: t.leadName });
+			var emailInput = el('input', { type: 'email', class: 'wkc-lead-input', placeholder: t.leadEmail });
+			var compInput = el('input', { type: 'text', class: 'wkc-lead-input', placeholder: t.leadCompany });
+			var msgInput = el('textarea', { class: 'wkc-lead-textarea', rows: '2', placeholder: t.leadMessage });
+
+			card.appendChild(nameInput);
+			card.appendChild(emailInput);
+			card.appendChild(compInput);
+			card.appendChild(msgInput);
+
+			var leadErr = el('div', { class: 'wkc-lead-error', 'aria-live': 'polite' });
+			card.appendChild(leadErr);
+
+			var btnRow = el('div', { class: 'wkc-lead-actions' });
+			var submitBtn = el('button', { type: 'button', class: 'wkc-lead-submit' }, t.leadSubmit);
+			var cancelBtn = el('button', { type: 'button', class: 'wkc-lead-cancel' }, t.leadCancel);
+
+			cancelBtn.addEventListener('click', function () {
+				card.remove();
+			});
+
+			submitBtn.addEventListener('click', function () {
+				var nameVal = nameInput.value.trim();
+				var emailVal = emailInput.value.trim();
+				if (!nameVal || !emailVal || emailVal.indexOf('@') === -1) {
+					leadErr.textContent = t.leadError;
+					return;
+				}
+				submitBtn.disabled = true;
+				cancelBtn.disabled = true;
+				leadErr.textContent = '';
+
+				var leadEndpoint = (config.restUrl || '').replace(/\/chat$/, '/lead');
+				fetch(leadEndpoint, {
+					method: 'POST',
+					credentials: 'omit',
+					headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+					body: JSON.stringify({
+						name: nameVal,
+						email: emailVal,
+						company: compInput.value.trim(),
+						message: msgInput.value.trim()
+					})
+				})
+					.then(function (res) { return res.json(); })
+					.then(function (data) {
+						card.remove();
+						addMessage({
+							role: 'bot',
+							text: (data && data.message) ? data.message : t.leadSuccess,
+							grounded: true
+						});
+					})
+					.catch(function () {
+						submitBtn.disabled = false;
+						cancelBtn.disabled = false;
+						leadErr.textContent = t.errNetwork;
+					});
+			});
+
+			btnRow.appendChild(submitBtn);
+			btnRow.appendChild(cancelBtn);
+			card.appendChild(btnRow);
+			parentItem.appendChild(card);
+			nameInput.focus();
+		}
+
 		function renderMessage(msg) {
 			var item = el('div', { class: 'wkc-msg wkc-msg--' + msg.role });
 			item.appendChild(el('span', { class: 'wkc-sr-only' }, msg.role === 'user' ? t.you : t.assistant));
 			var bubble = el('div', { class: 'wkc-bubble' });
 			String(msg.text).split(/\n{2,}/).forEach(function (para) {
-				bubble.appendChild(el('p', null, para));
+				var lines = para.split(/\n/);
+				var hasBullets = lines.some(function (l) { return /^[-*•]\s+/.test(l.trim()); });
+				if (hasBullets) {
+					var ul = el('ul', { class: 'wkc-bullet-list' });
+					lines.forEach(function (line) {
+						var trimmed = line.trim();
+						if (/^[-*•]\s+/.test(trimmed)) {
+							ul.appendChild(el('li', null, trimmed.replace(/^[-*•]\s+/, '')));
+						} else if (trimmed) {
+							ul.appendChild(el('li', null, trimmed));
+						}
+					});
+					bubble.appendChild(ul);
+				} else {
+					var p = el('p');
+					lines.forEach(function (line, idx) {
+						if (idx > 0) p.appendChild(document.createElement('br'));
+						p.appendChild(document.createTextNode(line));
+					});
+					bubble.appendChild(p);
+				}
 			});
 			item.appendChild(bubble);
 
@@ -343,10 +481,19 @@
 					wrap.appendChild(list);
 					item.appendChild(wrap);
 				}
-				if (!msg.grounded && !msg.isGreeting && contactUrl) {
-					var cta = el('p', { class: 'wkc-cta' });
-					cta.appendChild(externalLink(contactUrl, t.contactPrompt));
-					item.appendChild(cta);
+				if (!msg.grounded && !msg.isGreeting) {
+					if (contactUrl) {
+						var cta = el('p', { class: 'wkc-cta' });
+						cta.appendChild(externalLink(contactUrl, t.contactPrompt));
+						item.appendChild(cta);
+					}
+					var leadAction = el('div', { class: 'wkc-lead-trigger' });
+					var consultBtn = el('button', { type: 'button', class: 'wkc-lead-btn' }, t.requestConsult);
+					consultBtn.addEventListener('click', function () {
+						renderLeadForm(item);
+					});
+					leadAction.appendChild(consultBtn);
+					item.appendChild(leadAction);
 				}
 			}
 			log.appendChild(item);
@@ -426,6 +573,10 @@
 			title.textContent = t.title;
 			subtitle.textContent = t.subtitle;
 			closeBtn.setAttribute('aria-label', t.close);
+			if (clearBtn) {
+				clearBtn.setAttribute('aria-label', t.clear);
+				clearBtn.setAttribute('title', t.clear);
+			}
 			launcher.setAttribute('aria-label', panel.hidden ? t.open : t.close);
 			log.setAttribute('aria-label', t.title);
 			suggestions.setAttribute('aria-label', t.suggestions);
