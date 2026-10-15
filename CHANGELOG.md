@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-10-15
+
+Audit and remediation of 0.2.0. Details and evidence: [docs/audit-2026-10-15.md](docs/audit-2026-10-15.md).
+
+### Security
+- Password-protected pages are never indexed. Content is rendered as an anonymous visitor for indexing, so members-only shortcode output cannot leak.
+- Only pages an administrator synced from the Knowledge Base screen are updated automatically. Publishing a new page no longer pushes it to the AI backend.
+- Lead endpoint: field length limits, a separate rate limit (3 per visitor per 10 min, 30 per site per hour), honeypot, duplicate suppression, no echo of submitted data.
+- Backend: the configured `kb.json` is loaded in preference to `/tmp/wkc-kb.json`, and a corrupt file no longer falls back to another snapshot. `/api/index` returns 501 on Netlify (updates would reach one instance only). Netlify no longer publishes compiled `dist/`.
+- CI: least-privilege permissions; the ZIP is scanned for credential-like strings.
+
+### Fixed
+- Trashed pages were never removed from the knowledge base (WordPress renames the slug to `…__trashed`). Slug changes now replace the old document. Failed automatic updates are recorded, shown and retried.
+- KB v2.0 reopened the price and client-name gates ("pricing terms", "Project Portfolio"). Unanswerable design-set questions stopped went from 28/33 back to 100%.
+- Lead storage evicted older leads after 100 submissions. Leads are now one private post each (`wkc_lead`), migrated from the `wkc_leads` option without loss.
+- The `wp_mail()` result was ignored. Delivery status is now recorded, and storage failures return an error instead of success.
+- Widget lead form: server errors were shown as success and the visitor's input was lost. Fields now have labels, length limits and a visible focus ring.
+- Analytics stored contact details from questions verbatim. E-mails, phone numbers, links and long numbers are now redacted.
+
+### Added
+- Analytics & Leads: delete one or all leads, CSV export (formula-safe), reset metrics, notification status. WordPress privacy exporter/eraser. Filters `wp_knowledge_chat_lead_retention_days`, `…_lead_limit_per_hour`, `…_lead_notification_email`, `…_store_query_snippets`, `…_boilerplate_lines`. Actions `…_lead_mail_failed`, `…_sync_failure`.
+- Scope rules: VAT/duties, capital requirements, contract review, sport (EN/ID/KO). Office-location answer type. Claim check for names absent from the evidence. Provider cooldown after quota or auth errors.
+- `npm run kb:verify-sources`: checks each KB document's text against its live page.
+- Evaluation: `--min-answerable`/`--min-stopped` thresholds, false-refusal count, follow-up questions with history, live `--max-model-calls`, token/cost/latency/error reporting, `human_review` fields. 17 new design items. Six contaminated held-out items moved to the design set.
+- CI: held-out evaluation, design-set stop threshold, widget tests, PHP 8.5 matrix, PHP 8.1 syntax job, ZIP lifecycle check.
+
 ## [0.2.0] - 2026-10-15
 
 ### Added

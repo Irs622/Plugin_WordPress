@@ -6,9 +6,9 @@
 ![WordPress 6.4+](https://img.shields.io/badge/WordPress-6.4%2B%20(tested%207.1.3)-21759b)
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4)
 ![Node.js 20.11+](https://img.shields.io/badge/Node.js-20.11%2B-339933)
-![Version 0.2.0](https://img.shields.io/badge/version-0.2.0-informational)
+![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-informational)
 
-> **Status: MVP, verified locally, not deployed. Ready for staging, not for production.** All automated suites pass ([test report](docs/test-report.md)). The real Gemini model has **not** been exercised yet (no API key), and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy. It is not production-ready until the staging checklist in [docs/deployment.md](docs/deployment.md) is complete and the open content questions are answered.
+> **Status: 0.2.1, verified locally, not deployed. Not ready for production; staging is blocked by one content decision.** The current knowledge base (KB v2.0) is not supported by the pages it cites (`npm run kb:verify-sources`: 0–8% of each document found on its page, `/faq/` is 404). See the [2026-10-15 audit](docs/audit-2026-10-15.md). All automated suites pass locally on SQLite with a mock model. The real Gemini model has **not** been evaluated, and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy.
 
 ## Contents
 
@@ -138,17 +138,18 @@ bin/setup-wp.sh                   # creates <repo>/.wp-test (and its `wp` wrappe
 scripts/test-all.sh               # backend, KB validation, evaluation, phpcs, PHPUnit, widget, E2E + Chrome, packaging + ZIP lifecycle
 ```
 
-| Suite | Command | Result (2026-10-15) |
+| Suite | Command | Result (2026-10-15, 0.2.1) |
 |---|---|---|
-| Backend | `cd backend && npm test` | 104 / 104 |
-| Knowledge base | `npm run kb:validate` | 0 errors (1 warning: optional M&A page empty) |
-| Offline evaluation, design set | `npm run eval:retrieval` | 43 / 43 answerable reach the model with the right page; 33 / 33 unanswerable stopped before the model |
-| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 21 / 23 answerable; 20 / 26 unanswerable stopped |
+| Backend | `cd backend && npm test` | 119 / 119 |
+| Knowledge base | `npm run kb:validate` | 0 errors |
+| Cited pages contain the KB text (network) | `npm run kb:verify-sources` | **7 / 7 documents fail** (see audit F1) |
+| Offline evaluation, design set | `npm run eval:retrieval -- --min-stopped=1` | 49 / 49 answerable reach the model with the right page, 0 false refusals; 48 / 48 unanswerable stopped |
+| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 25 / 25 answerable; 18 / 18 unanswerable stopped (6 items moved to the design set; refresh needed) |
 | Static analysis | `cd plugin/wp-knowledge-chat/tests && vendor/bin/phpcs` | 0 findings |
-| Plugin (real WordPress) | `vendor/bin/phpunit` | 80 / 80 |
-| Widget | `npm run test:widget` | 30 / 30 |
-| End-to-end + browser | `e2e/run.sh` | 12 / 12 HTTP, 15 / 15 Chrome (incl. Korean switch + axe) |
-| ZIP lifecycle | `bin/package-check.sh` | install, activate, deactivate, uninstall, reinstall |
+| Plugin (real WordPress) | `vendor/bin/phpunit` | 123 / 123 |
+| Widget | `npm run test:widget` | 34 / 34 |
+| End-to-end + browser | `e2e/run.sh` | 12 / 12 HTTP, 16 / 16 Chrome (incl. Korean switch, axe on panel and lead form) |
+| ZIP lifecycle | `bin/package-check.sh` | credential scan, install, activate, 0.2.0 lead migration, deactivate, uninstall (removes leads), reinstall |
 
 The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (see [docs/evaluation.md](docs/evaluation.md)).
 
@@ -166,7 +167,7 @@ The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (se
 Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs/deployment.md)):
 
 1. Deploy the backend to an HTTPS Node.js host (single instance) with its environment variables set.
-2. Build the plugin ZIP: `scripts/package-plugin.sh` → `dist/wp-knowledge-chat-0.2.0.zip`.
+2. Build the plugin ZIP: `scripts/package-plugin.sh` → `dist/wp-knowledge-chat-0.2.1.zip`.
 3. On **staging**: verify the ZIP checksum, add the `wp-config.php` constants, upload and activate the ZIP, and click **Test connection**. Keep the Contact URL at the homepage default unless the owner approves a dedicated contact page.
 4. Run `npm run eval:live` against the staging backend with a real Gemini key and have Inpartner review the answers.
 5. Go to production only with the site owner's explicit approval.
@@ -179,18 +180,20 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 | Developers | [Architecture](docs/architecture.md) · [Tech stack](docs/tech-stack.md) · [API contract](docs/api-contract.md) · [Backend README](backend/README.md) · [Plugin readme.txt](plugin/wp-knowledge-chat/readme.txt) · [Contributing](CONTRIBUTING.md) |
 | Operations | [Deployment, rollback & troubleshooting](docs/deployment.md) · [Knowledge base](docs/knowledge-base.md) |
 | Security | [Security design](docs/security.md) · [Security policy](SECURITY.md) |
-| Quality | [Audit report](docs/audit-report.md) · [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
+| Quality | [Audit 2026-10-15 (0.2.1)](docs/audit-2026-10-15.md) · [Audit report (0.1.0)](docs/audit-report.md) · [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
 | Product | [PRD](prd.md) · [Changelog](CHANGELOG.md) |
 
 ## Known limitations
 
+- The knowledge base text is not on the pages it cites (audit F1); an owner decision is needed before staging.
 - Answer quality with the real Gemini model has not been measured yet.
 - Each question is answered on its own: follow-ups such as "tell me more" lack context.
 - The assistant knows only 5 approved pages. The Cross-Border M&A page is empty and there is no FAQ or pricing page, so many questions get the fallback.
 - Backend rate limits and the replay cache are in memory, so run a single instance.
 - Out-of-scope detection is keyword-based (English/Indonesian/Korean) and can be evaded by rephrasing; the model and the claim check are the second line.
 - Korean and Indonesian questions are matched against the English pages through curated term maps, not translation. Questions using words outside the map get the fallback; add terms when the evaluation shows misses.
-- The assistant gives no phone number until Inpartner confirms which of the two published numbers is correct.
+- KB v2.0 includes the phone number +62 859 3454 8202; the live contact page still shows two other numbers as well, one a placeholder.
+- Leads are stored in WordPress (private post type) and e-mailed to the admin; see the privacy section of [readme.txt](plugin/wp-knowledge-chat/readme.txt). Retention is "until deleted" unless configured.
 - Not yet tested with MySQL, LiteSpeed Cache or on real mobile devices.
 
 The full list is in the [test report](docs/test-report.md#known-limitations).

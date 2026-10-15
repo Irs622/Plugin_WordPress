@@ -4,7 +4,7 @@ Tags: chatbot, faq, ai assistant, knowledge base, gemini
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.0
+Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -151,13 +151,23 @@ REST endpoint: `POST /wp-json/wp-knowledge-chat/v1/chat` with `{"message": "..."
 * Visitor questions are sent to the configured AI backend, which forwards them, together with excerpts of public website pages, to Google Gemini to generate an answer.
 * The visitor's IP address, cookies and identity are not sent. A salted one-way identifier is used for rate limiting.
 * The backend logs operational events (outcome, language, message length, latency) but not message text.
-* Site owners should mention the AI assistant and Google Gemini in their privacy policy.
+* WordPress keeps aggregate counts (questions, grounded/fallback, language) and the 25 most recent question snippets for the Analytics & Leads screen. Snippets have e-mail addresses, phone numbers, links and long numbers replaced, but can still contain other personal details a visitor typed. Turn snippets off with `add_filter( 'wp_knowledge_chat_store_query_snippets', '__return_false' );`.
+* **Consultation requests (leads).** When a visitor submits the optional form, their name, e-mail, company and message are stored in WordPress (a private post type `wkc_lead`, visible only to administrators on Analytics & Leads) and e-mailed to the site's admin address (filter `wp_knowledge_chat_lead_notification_email`). The IP address is not stored.
+* Leads are kept until an administrator deletes them (per lead, "Delete all", or Tools → Erase Personal Data). Set a retention period with `add_filter( 'wp_knowledge_chat_lead_retention_days', fn() => 180 );`. Leads can be exported as CSV or per person via Tools → Export Personal Data.
+* Abuse limits on the lead form: 3 submissions per visitor per 10 minutes, 30 per site per hour (filter `wp_knowledge_chat_lead_limit_per_hour`), a hidden honeypot field, field length limits and suppression of identical resubmissions.
+* Site owners should mention the AI assistant, Google Gemini and the consultation form in their privacy policy.
 
 == Uninstall ==
 
-Deactivating keeps the settings. Deleting the plugin from the Plugins screen runs `uninstall.php`, which removes the `wp_knowledge_chat_settings` option and the plugin's transients. Remove the two `wp-config.php` constants manually.
+Deactivating keeps the settings, leads and metrics. Deleting the plugin from the Plugins screen runs `uninstall.php`, which removes the `wp_knowledge_chat_settings` option, the metrics, **all stored leads**, the knowledge-base sync state and the plugin's transients. Export leads first (Analytics & Leads → Export CSV) if you need to keep them. Remove the `wp-config.php` constants manually.
 
 == Changelog ==
+
+= 0.2.1 =
+* Security/privacy: leads are stored one per record (a flood of submissions can no longer push out earlier leads), with field length limits, a separate rate limit, a honeypot, duplicate suppression, mail-failure tracking, delete/export actions, retention filter and WordPress privacy exporter/eraser.
+* Security: password-protected pages are never indexed; content is rendered as an anonymous visitor for indexing.
+* Knowledge base: only pages an administrator synced are updated automatically; new pages are no longer pushed on publish. Trashed pages are now removed (the trash slug suffix broke removal), slug changes replace the old entry, failed updates are retried and shown.
+* Widget: the consultation form keeps the visitor's input on errors instead of showing the error as a success, has labelled fields and sends the visitor's language.
 
 = 0.2.0 =
 * Korean (한국어) as a third language: interface, error messages and answers.
@@ -168,6 +178,9 @@ Deactivating keeps the settings. Deleting the plugin from the Plugins screen run
 * Initial MVP: chat widget, four admin settings, signed REST proxy to the AI backend, rate limiting, source links, fallback, English and Indonesian interface.
 
 == Upgrade Notice ==
+
+= 0.2.1 =
+Existing leads are moved to the new storage automatically. After upgrading, open WP Knowledge Chat → Knowledge Base and sync your approved pages once: only synced pages receive automatic updates from now on. Purge the page cache.
 
 = 0.2.0 =
 Adds Korean and a language switcher. The single greeting becomes one greeting per language; a customised greeting is kept for the default language. Purge the page cache after upgrading.

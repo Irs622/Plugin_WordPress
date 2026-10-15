@@ -39,17 +39,18 @@ Static analysis: `phpcs` with `WordPress.Security`, `WordPress.DB.PreparedSQL*` 
 
 ## Data handling and privacy
 
-- **Stored by WordPress:** the four settings; short-lived rate-limit transients keyed by an HMAC of the IP (no raw IP stored).
+- **Stored by WordPress:** the settings; short-lived rate-limit transients keyed by an HMAC of the IP (no raw IP stored); aggregate chat counts plus the 25 latest question snippets with e-mail addresses, phone numbers, links and long numbers redacted (can be turned off); the list of synced pages.
 - **Sent to the backend:** question text, language, a salted one-way client id. **Never** the IP, cookies or user identity.
 - **Sent to Google Gemini:** the question plus retrieved public website excerpts. Under Google's API terms, data handling depends on the account tier. Review whether paid-tier "no training" terms are required before launch (PRD §12 Privacy).
 - **Logged by the backend:** event name, outcome, language, message *length*, latency, error kind. Never message text, IPs or secrets.
 - **Browser:** conversation in `sessionStorage` only (cleared when the tab closes).
-- **Lead capture:** not implemented. If added, it needs consent, a retention period and access controls first (PRD §11).
+- **Lead capture (0.2.1):** name, e-mail, company and message in a private post type `wkc_lead`, visible only to `manage_options` users (no UI, REST, query var, export or core capabilities). Limits: field lengths, 3 per visitor per 10 min, 30 per site per hour, honeypot, duplicate suppression. Notification e-mail to the admin address; its delivery status is recorded. Kept until deleted (per lead, all, Tools → Erase Personal Data) or for `wp_knowledge_chat_lead_retention_days`. Deleted on uninstall. The retention period and privacy-policy wording are owner decisions.
 
 ## Residual risks / not covered
 
 - Rate limits and the replay cache in the backend are per-process memory. Several instances or restarts reset counters, and a replay could succeed against a *different* instance inside the 5-minute window. Run a single instance (see [deployment.md](deployment.md#scaling-decision)). WordPress transients without a persistent object cache add database writes per chat request, and concurrent requests can exceed the per-IP limit slightly (transients are not atomic); the backend limits still apply.
 - The `Origin` check is not authentication: non-browser clients can omit or forge it. It only stops other websites from using visitors' browsers. Anonymous abuse is bounded by the rate limits and the daily model-call budget.
 - Behind a CDN or proxy, every visitor shares the proxy's IP (one rate-limit bucket for the whole site) until `WP_KNOWLEDGE_CHAT_TRUSTED_PROXIES` lists the proxy ranges. Listing too broad a range lets visitors forge `X-Forwarded-For`.
-- LLM behaviour can only be reduced, not eliminated, by prompt rules and checks. The deterministic gate stops all 25 unanswerable design-set questions and 16 of 22 held-out ones before the model; the other 6 held-out questions depend on the model declining, backed by the claim check, which catches invented numbers and contact details but **not** invented prose (for example "Yes, we have a London office"). The gate's patterns are English/Indonesian keyword rules and can be evaded by rephrasing. A live evaluation with the real model has **not** been run (no API key).
+- LLM behaviour can only be reduced, not eliminated, by prompt rules and checks. The deterministic gate (0.2.1) stops all 48 unanswerable design-set questions and all 18 remaining held-out ones before the model. The claim check catches invented numbers, contact details and (heuristically) names absent from the evidence, but **not** invented prose. The patterns are EN/ID/KO keyword rules and can be evaded by rephrasing. A live evaluation with the real model has **not** been run.
+- **Citations vs. pages:** the backend guarantees a citation points at an approved KB document. It cannot guarantee the cited web page contains that text. `npm run kb:verify-sources` checks this against the live site; the 0.2.1 audit found KB v2.0 fails it (audit F1).
 - No WAF/bot protection. Sustained abuse is bounded by the daily budget, which also blocks legitimate users once reached (it now counts model calls only, so questions answered by the fallback do not use it up).

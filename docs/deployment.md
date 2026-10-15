@@ -30,6 +30,8 @@ The backend keeps rate-limit counters, the daily model-call budget and the signa
 - with two instances, each enforces its own limits (effective limits double) and a captured request could be replayed once against the other instance inside the 5-minute window;
 - a restart resets the counters and the daily budget.
 
+**Serverless (Netlify Functions) is not equivalent.** Every function instance has its own memory and `/tmp`, so the limits above are per instance. Since 0.2.1, `/api/index` returns **501** there, because an update would reach only one instance and vanish on cold start. Update the knowledge base by committing `data/kb.json` and redeploying. Use Netlify only after accepting per-instance limits, or after adding shared state.
+
 Expected MVP traffic (well under the 60 requests/minute global limit) fits one small instance, so **single-instance mode is the supported deployment** and no Redis or database was added. Configure the platform accordingly (for example Cloud Run `--max-instances=1`, one Render/Railway instance, one systemd service). Move these three stores to a shared store (Redis with `INCR`/`EXPIRE` and `SET NX EX`) only if traffic or availability requirements make a second instance necessary; that is an infrastructure decision for the system administrator.
 
 ## 1. Deploy the backend over HTTPS (staging)
@@ -137,7 +139,12 @@ cd dist && shasum -a 256 -c wp-knowledge-chat-0.2.0.zip.sha256
 | 16 | Monitoring: backend log alerts on `llm_failed`, `chat_auth_failed`, `rate_limited scope=daily`; uptime check on `/api/health`; Google Cloud budget alert | ☐ | ☐ | ☐ |
 | 17 | `DAILY_REQUEST_LIMIT` set from the approved budget | **B** (budget not decided) | ☐ | ☐ |
 | 18 | Rollback rehearsed (disable, deactivate, restore previous `kb.json`) | L (disable/enable in E2E) | ☐ | ☐ |
-| 19 | **Written approval from the site owner before any production change** | — | — | ☐ |
+| 19 | `npm run kb:verify-sources` passes against the site the backend cites (every KB document is on its page) | **B** (fails: audit F1) | ☐ | ☐ |
+| 20 | Upgrade 0.2.0 → 0.2.1 keeps every lead; a widget lead reaches a staging inbox; a mail failure shows "Failed" on the dashboard | L (migration in `package-check.sh`, mail mocked) | ☐ | ☐ |
+| 21 | Lead abuse: 4th submission in 10 min → 429; honeypot stores nothing | L (PHPUnit) | ☐ | ☐ |
+| 22 | Sync: synced page edit/rename/unpublish/protect/trash each reflected in answers; backend stopped → pending notice → **Retry now** clears it | L (PHPUnit, mocked backend) | ☐ | ☐ |
+| 23 | After upgrade, sync approved pages once (only synced pages are updated automatically) | — | ☐ | ☐ |
+| 24 | **Written approval from the site owner before any production change** | — | — | ☐ |
 
 ## 5. Production (only after approval)
 
@@ -149,7 +156,8 @@ Repeat sections 1–3 against production with production secrets (new values, no
 |---|---|---|
 | Widget misbehaving | Settings → untick **Enable Chatbot** → Save (LiteSpeed purges automatically) | Widget no longer printed; chat route returns 503 |
 | Plugin problem | Plugins → Deactivate (or rename `wp-content/plugins/wp-knowledge-chat` via FTP) | Plugin code not loaded; settings kept |
-| Remove completely | Deactivate → Delete | `uninstall.php` deletes the option and plugin transients |
+| Remove completely | Export leads (Analytics & Leads → Export CSV), then Deactivate → Delete | `uninstall.php` deletes settings, metrics, **all leads**, sync state and transients |
+| Downgrade to 0.2.0 | Export leads first | 0.2.0 does not read the 0.2.1 lead storage (leads stay in the database but are not shown) |
 | Backend problem | Stop or roll back the backend deployment | Widget shows "unavailable" errors; site unaffected |
 | Bad knowledge base | Redeploy the previous `data/kb.json` or `npm run kb:push -- --file=<previous>` | Index replaced atomically |
 | Cost spike | Lower `DAILY_REQUEST_LIMIT` and restart, or disable the widget | Further model calls refused with 429 |

@@ -1,5 +1,7 @@
 # Answer-quality evaluation
 
+> **Update 2026-10-15 (0.2.1 audit, [details](audit-2026-10-15.md#5-evaluation)).** KB v2.0 had quietly reopened the price and client gates ("pricing terms", "Project Portfolio"): design set 28/33 stopped, held-out 16/24. After the fixes: design set 49/49 answerable reach the model with the right page, 0 false refusals, 48/48 unanswerable stopped (CI now fails below 100%); held-out 25/25 and 18/18. Six held-out items the rules were fixed against were **moved to the design set**, so the held-out set must be refreshed. The live (Gemini) evaluation is still **not run**. It now supports `--max-model-calls`, token/cost reporting and per-row `human_review` fields. Separately, `npm run kb:verify-sources` shows the KB v2.0 text is not on the cited pages; fix that before any human review of grounded answers. The sections below describe the 0.2.0 state.
+
 How the assistant's answer quality is measured against the PRD targets (§11 and §13). Latest results are in [test-report.md](test-report.md).
 
 Two things are measured separately and must not be confused:
