@@ -50,6 +50,7 @@ $c = str_replace("define( \x27WP_DEBUG\x27, false );", "define( \x27WP_DEBUG\x27
 $extra = "define( \x27DB_DIR\x27, __DIR__ . \x27/../db\x27 );\ndefine( \x27WP_DEBUG_LOG\x27, __DIR__ . \x27/../debug.log\x27 );\ndefine( \x27WP_DEBUG_DISPLAY\x27, false );\ndefine( \x27WP_ENVIRONMENT_TYPE\x27, \x27local\x27 );\n";
 $extra .= "if ( getenv( \x27WKC_BACKEND_URL\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_BACKEND_URL\x27, getenv( \x27WKC_BACKEND_URL\x27 ) ); }\n";
 $extra .= "if ( getenv( \x27WKC_SHARED_SECRET\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_SHARED_SECRET\x27, getenv( \x27WKC_SHARED_SECRET\x27 ) ); }\n";
+$extra .= "if ( getenv( \x27WKC_INDEX_TOKEN\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN\x27, getenv( \x27WKC_INDEX_TOKEN\x27 ) ); }\n";
 $c = str_replace("/* That\x27s all, stop editing!", $extra . "/* That\x27s all, stop editing!", $c);
 file_put_contents($f, $c);
 ' "$WP_DIR/wp-config.php"
