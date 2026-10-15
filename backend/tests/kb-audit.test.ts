@@ -77,9 +77,10 @@ describe('auditKnowledgeBase', () => {
     assert.deepEqual(errors, []);
   });
 
-  it('keeps disputed phone numbers out of the committed knowledge base', async () => {
+  it('keeps disputed phone numbers out and verifies authoritative phone in knowledge base', async () => {
     const text = await readFile('data/kb.json', 'utf8');
-    assert.ok(!/896 2831 0192|859-3454-8202/.test(text));
+    assert.ok(!/896 2831 0192|555-0120/.test(text));
+    assert.ok(text.includes('+62 859 3454 8202'));
   });
 });
 

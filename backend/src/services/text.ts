@@ -65,6 +65,30 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   proses: ['approach', 'process'],
   langkah: ['approach', 'step'],
   siapa: ['who', 'about'],
+  eksekutif: ['executive', 'search', 'talent'],
+  rekrutmen: ['executive', 'search', 'talent'],
+  talenta: ['talent', 'leadership'],
+  sdm: ['human', 'capital', 'talent'],
+  organisasi: ['organization', 'development'],
+  pelatihan: ['training', 'capacity'],
+  kapasitas: ['capacity', 'building'],
+  kelayakan: ['feasibility', 'study'],
+  studi: ['feasibility', 'study'],
+  modal: ['capital', 'market', 'ipo'],
+  ipo: ['ipo', 'capital', 'market'],
+  restrukturisasi: ['restructuring', 'corporate'],
+  transformasi: ['transformation'],
+  riset: ['research', 'intelligence'],
+  inteligensi: ['intelligence', 'research'],
+  teknologi: ['technology', 'transfer'],
+  sejarah: ['history', 'established', 'originated', '2009', '2019'],
+  berdiri: ['established', 'originated', 'history', '2009', '2019'],
+  keunggulan: ['competitive', 'advantage'],
+  nilai: ['values', 'integrity'],
+  sektor: ['sector', 'industry', 'expertise'],
+  industri: ['industry', 'expertise'],
+  negara: ['geographic', 'coverage', 'global'],
+  global: ['global', 'coverage'],
   // English paraphrases
   service: ['service', 'advisory'],
   offer: ['service', 'advisory'],
@@ -80,6 +104,7 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   office: ['tower', 'jakarta', 'address'],
   located: ['tower', 'jakarta', 'address'],
   location: ['tower', 'jakarta', 'address'],
+  based: ['office', 'tower', 'jakarta', 'address', 'location'],
   phone: ['call', 'phone'],
   telephone: ['call', 'phone'],
   mail: ['email'],
@@ -99,6 +124,21 @@ const QUERY_EXPANSIONS: Record<string, string[]> = {
   team: ['about'],
   firm: ['about', 'advisory'],
   indonesian: ['indonesia'],
+  executive: ['executive', 'search', 'talent'],
+  headhunting: ['executive', 'search', 'talent'],
+  recruitment: ['executive', 'search', 'talent'],
+  talent: ['talent', 'leadership'],
+  training: ['training', 'capacity'],
+  feasibility: ['feasibility', 'study'],
+  restructuring: ['restructuring', 'corporate'],
+  transformation: ['transformation'],
+  venture: ['joint', 'venture'],
+  history: ['history', 'established', 'originated', '2009', '2019'],
+  founded: ['established', 'originated', 'history', '2009', '2019'],
+  countries: ['geographic', 'coverage'],
+  coverage: ['geographic', 'coverage'],
+  sectors: ['sector', 'industry', 'expertise'],
+  industries: ['industry', 'expertise'],
 };
 
 /**
@@ -203,6 +243,10 @@ export function tokenizeQuery(text: string): string[] {
   const nfc = plain.normalize('NFC');
   for (const [term, expansions] of KOREAN_EXPANSIONS) {
     if (nfc.includes(term)) for (const e of expansions) out.add(stem(e));
+  }
+  if (/\bwhat do you do\b/i.test(plain)) {
+    out.add('about');
+    out.add('firm');
   }
   for (const raw of normalizeText(plain).split(/[^a-z0-9]+/)) {
     if (raw.length < 2) continue;

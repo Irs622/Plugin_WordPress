@@ -104,7 +104,7 @@ export function loadConfig(env: Env = process.env): Config {
     problems.push('GEMINI_MODEL contains invalid characters');
   }
 
-  const allowedSourceHosts = (env.ALLOWED_SOURCE_HOSTS?.trim() || 'inpartnerglobal.com,www.inpartnerglobal.com')
+  const allowedSourceHosts = (env.ALLOWED_SOURCE_HOSTS?.trim() || 'inpartnerglobal.com,www.inpartnerglobal.com,inpartner.id,www.inpartner.id')
     .split(',')
     .map((h) => h.trim().toLowerCase())
     .filter(Boolean);

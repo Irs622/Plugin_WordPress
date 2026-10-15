@@ -24,7 +24,7 @@ final class Settings {
 	private const LEGACY_DEFAULT_GREETING = "Hello! How can I help you explore Inpartner's services?";
 
 	/** Hosts approved for the contact link and for cited sources. Extend with the filters below. */
-	private const DEFAULT_APPROVED_HOSTS = array( 'inpartnerglobal.com', 'www.inpartnerglobal.com' );
+	private const DEFAULT_APPROVED_HOSTS = array( 'inpartnerglobal.com', 'www.inpartnerglobal.com', 'inpartner.id', 'www.inpartner.id' );
 
 	/** @var array<string,bool> Error codes already reported during this request (WordPress may sanitize twice). */
 	private static array $reported = array();

@@ -10,7 +10,7 @@ describe('loadConfig', () => {
     assert.equal(config.port, 8787);
     assert.equal(config.maxMessageChars, 500);
     assert.equal(config.geminiApiBaseUrl, 'https://generativelanguage.googleapis.com');
-    assert.deepEqual(config.allowedSourceHosts, ['inpartnerglobal.com', 'www.inpartnerglobal.com']);
+    assert.deepEqual(config.allowedSourceHosts, ['inpartnerglobal.com', 'www.inpartnerglobal.com', 'inpartner.id', 'www.inpartner.id']);
   });
 
   it('reports every missing required variable without echoing values', () => {
