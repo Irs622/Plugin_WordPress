@@ -12,6 +12,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Least privilege by default; only the release step below may write.
+permissions:
+  contents: read
+
 jobs:
   backend-ci:
     name: Backend AI CI (Node.js)
@@ -39,17 +43,43 @@ jobs:
         working-directory: backend
         run: npm run kb:validate
 
-      - name: Evaluate BM25 Retrieval Quality
+      # Design set: the gate rules are written against it, so every unanswerable item must be
+      # stopped before the model and >= 90% of answerable items must reach it with the right page.
+      # (A KB change on 2026-10-15 silently dropped this to 28/33 because nothing enforced it.)
+      - name: Offline evaluation, design set
         working-directory: backend
-        run: npm run eval:retrieval
+        run: node dist/eval/run-eval.js --mode=retrieval --min-stopped=1
+
+      - name: Offline evaluation, held-out set
+        working-directory: backend
+        run: node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json
 
       - name: Run Backend Unit & Integration Tests
         working-directory: backend
         run: npm test
 
-  plugin-ci:
-    name: WordPress Plugin CI (PHP)
+  plugin-lint-min-php:
+    name: PHP syntax on the minimum supported version (8.1)
     runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - name: Lint PHP Syntax
+        run: |
+          find plugin/wp-knowledge-chat -name "*.php" -not -path "*/tests/*" -print0 | xargs -0 -n1 php -l > /dev/null
+          echo "All plugin PHP files parse on PHP 8.1."
+
+  plugin-ci:
+    name: WordPress Plugin CI (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.3: PHPUnit 12 minimum. 8.5: the production host's version.
+        php: ['8.3', '8.5']
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -57,25 +87,36 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
+          php-version: ${{ matrix.php }}
           extensions: mbstring, intl, sqlite3, curl, zip, pdo_sqlite
           tools: composer
           coverage: none
 
+      - name: Setup Node.js (widget tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: plugin/wp-knowledge-chat/tests/package-lock.json
+
       - name: Lint PHP Syntax
         run: |
-          for f in $(find plugin/wp-knowledge-chat -name "*.php"); do
-            php -l "$f" >/dev/null
-          done
+          find plugin/wp-knowledge-chat -name "*.php" -print0 | xargs -0 -n1 php -l > /dev/null
           echo "All PHP files passed syntax validation."
 
       - name: Install Test Tooling
         working-directory: plugin/wp-knowledge-chat/tests
-        run: composer install --prefer-dist --no-progress --ignore-platform-req=php+
+        run: |
+          composer install --prefer-dist --no-progress --ignore-platform-req=php+
+          npm ci
 
       - name: Check WordPress Coding Standards (PHPCS)
         working-directory: plugin/wp-knowledge-chat/tests
         run: vendor/bin/phpcs --standard=phpcs.xml.dist
+
+      - name: Widget tests (jsdom)
+        working-directory: plugin/wp-knowledge-chat/tests
+        run: npm run test:widget
 
       - name: Setup Disposable Local WordPress
         run: bash plugin/wp-knowledge-chat/tests/bin/setup-wp.sh
@@ -86,7 +127,7 @@ jobs:
 
   package-and-release:
     name: Package Plugin & Release Artifact
-    needs: [backend-ci, plugin-ci]
+    needs: [backend-ci, plugin-ci, plugin-lint-min-php]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -98,9 +139,15 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
+          extensions: mbstring, intl, sqlite3, zip, pdo_sqlite
 
       - name: Build Plugin Distribution ZIP
         run: ./scripts/package-plugin.sh
+
+      # Checksum, no dev files or credentials, install/activate/deactivate, 0.2.0 lead migration,
+      # uninstall (removes leads) and reinstall on a fresh WordPress.
+      - name: ZIP lifecycle check
+        run: bash plugin/wp-knowledge-chat/tests/bin/package-check.sh
 
       - name: Upload Plugin ZIP Artifact
         uses: actions/upload-artifact@v4

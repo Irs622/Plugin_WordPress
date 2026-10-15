@@ -14,7 +14,7 @@ step "Knowledge base validation (approved pages, no excluded content)"
 (cd "$REPO/backend" && npm run --silent kb:validate)
 
 step "Backend offline evaluation: design set, then held-out set"
-(cd "$REPO/backend" && npm run --silent eval:retrieval && node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json)
+(cd "$REPO/backend" && npm run --silent eval:retrieval -- --min-stopped=1 && node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json)
 
 step "Plugin static analysis (WordPress security sniffs + PHP compatibility)"
 (cd "$T" && vendor/bin/phpcs --standard=phpcs.xml.dist)
