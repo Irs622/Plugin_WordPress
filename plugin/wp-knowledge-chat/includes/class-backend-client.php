@@ -51,8 +51,17 @@ final class Backend_Client {
 		return is_string( $secret ) && strlen( $secret ) >= self::MIN_SECRET_LENGTH ? $secret : null;
 	}
 
+	public static function index_token(): ?string {
+		$token = defined( 'WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN' ) ? constant( 'WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN' ) : '';
+		return is_string( $token ) && strlen( $token ) >= self::MIN_SECRET_LENGTH ? $token : null;
+	}
+
 	public static function is_configured(): bool {
 		return null !== self::base_url() && null !== self::secret();
+	}
+
+	public static function is_index_configured(): bool {
+		return null !== self::base_url() && null !== self::index_token();
 	}
 
 	/**
@@ -146,5 +155,49 @@ final class Backend_Client {
 		}
 		$status = (int) wp_remote_retrieve_response_code( $response );
 		return array( 'ok' => 200 === $status, 'status' => $status );
+	}
+
+	/**
+	 * Sends documents to the AI backend POST /api/index.
+	 *
+	 * @param array<int,array{id:string,title:string,url:string,text:string,category:string,status:string,updated_at:string}> $documents
+	 * @param array<int,string> $delete_ids
+	 * @param bool              $replace_all
+	 * @return array{status:int, body:mixed}|\WP_Error
+	 */
+	public static function index( array $documents, array $delete_ids = array(), bool $replace_all = false ) {
+		if ( ! self::is_index_configured() ) {
+			return new \WP_Error( 'wkc_index_not_configured', 'Index token or backend URL is not configured.' );
+		}
+
+		$payload = array(
+			'documents'   => $documents,
+			'delete_ids'  => $delete_ids,
+			'replace_all' => $replace_all,
+		);
+
+		$response = wp_remote_post(
+			self::base_url() . '/api/index',
+			array(
+				'timeout'             => 30,
+				'redirection'         => 0,
+				'limit_response_size' => 65536,
+				'headers'             => array(
+					'Content-Type'  => 'application/json',
+					'Accept'        => 'application/json',
+					'Authorization' => 'Bearer ' . self::index_token(),
+				),
+				'body'                => wp_json_encode( $payload ),
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return $response;
+		}
+
+		return array(
+			'status' => (int) wp_remote_retrieve_response_code( $response ),
+			'body'   => json_decode( wp_remote_retrieve_body( $response ), true ),
+		);
 	}
 }

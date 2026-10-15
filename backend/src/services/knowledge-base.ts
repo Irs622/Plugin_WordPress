@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 /**
  * Knowledge-base documents and their persistence. Documents are validated
@@ -265,14 +266,35 @@ export class KnowledgeBaseStore {
   }
 }
 
+const FALLBACK_TMP_PATH = join(tmpdir(), 'wkc-kb.json');
+
 export async function readKnowledgeBaseFile(path: string): Promise<unknown> {
+  if (path !== FALLBACK_TMP_PATH) {
+    try {
+      return JSON.parse(await readFile(FALLBACK_TMP_PATH, 'utf8'));
+    } catch {
+      // Fall through to requested path
+    }
+  }
   return JSON.parse(await readFile(path, 'utf8'));
 }
 
-/** Atomic write: a crash mid-write never leaves a truncated knowledge base. */
-export async function writeKnowledgeBaseFile(path: string, data: KnowledgeBaseFile): Promise<void> {
+async function writeAtomic(path: string, data: KnowledgeBaseFile): Promise<void> {
   await mkdir(dirname(path), { recursive: true });
   const tmp = `${path}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(tmp, JSON.stringify(data, null, 2) + '\n', { encoding: 'utf8', mode: 0o640 });
   await rename(tmp, path);
+}
+
+/** Atomic write: a crash mid-write never leaves a truncated knowledge base. */
+export async function writeKnowledgeBaseFile(path: string, data: KnowledgeBaseFile): Promise<void> {
+  try {
+    await writeAtomic(path, data);
+  } catch (err) {
+    if (err && typeof err === 'object' && (err as { code?: string }).code === 'EROFS') {
+      await writeAtomic(FALLBACK_TMP_PATH, data);
+      return;
+    }
+    throw err;
+  }
 }

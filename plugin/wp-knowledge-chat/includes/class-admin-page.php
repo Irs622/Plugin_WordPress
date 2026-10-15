@@ -16,13 +16,17 @@ defined( 'ABSPATH' ) || exit;
 final class Admin_Page {
 
 	public const SLUG          = 'wp-knowledge-chat';
+	public const SYNC_SLUG     = 'wp-knowledge-chat-sync';
 	public const CAPABILITY    = 'manage_options';
 	public const HEALTH_ACTION = 'wkc_test_connection';
+	public const SYNC_ACTION   = 'wkc_sync_kb';
+	public const SYNC_NONCE    = 'wkc_sync_nonce';
 
 	public function hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'add_fields' ) );
 		add_action( 'admin_post_' . self::HEALTH_ACTION, array( $this, 'handle_test_connection' ) );
+		add_action( 'admin_post_' . self::SYNC_ACTION, array( $this, 'handle_sync' ) );
 	}
 
 	public function add_menu(): void {
@@ -42,6 +46,14 @@ final class Admin_Page {
 			self::CAPABILITY,
 			self::SLUG,
 			array( $this, 'render' )
+		);
+		add_submenu_page(
+			self::SLUG,
+			__( 'Knowledge Base Sync', 'wp-knowledge-chat' ),
+			__( 'Knowledge Base', 'wp-knowledge-chat' ),
+			self::CAPABILITY,
+			self::SYNC_SLUG,
+			array( $this, 'render_sync_page' )
 		);
 	}
 
@@ -222,6 +234,12 @@ final class Admin_Page {
 				<?php wp_nonce_field( self::HEALTH_ACTION ); ?>
 				<?php submit_button( __( 'Test connection', 'wp-knowledge-chat' ), 'secondary', 'submit', false, $configured ? array() : array( 'disabled' => 'disabled' ) ); ?>
 			</form>
+			<?php if ( Backend_Client::is_index_configured() ) : ?>
+				<p style="margin-top:16px;"><strong><?php esc_html_e( 'Index API token configured.', 'wp-knowledge-chat' ); ?></strong>
+				<?php esc_html_e( 'Knowledge base synchronization from WordPress pages is enabled.', 'wp-knowledge-chat' ); ?></p>
+			<?php else : ?>
+				<p style="margin-top:16px;"><em><?php esc_html_e( 'Note: To enable page synchronization to the AI backend, define WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN in wp-config.php.', 'wp-knowledge-chat' ); ?></em></p>
+			<?php endif; ?>
 		</div>
 		<?php
 	}
@@ -233,6 +251,211 @@ final class Admin_Page {
 		check_admin_referer( self::HEALTH_ACTION );
 		set_transient( 'wkc_health_' . get_current_user_id(), Backend_Client::health(), MINUTE_IN_SECONDS );
 		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SLUG ) );
+		exit;
+	}
+
+	public function render_sync_page(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You do not have permission to manage these settings.', 'wp-knowledge-chat' ), 403 );
+		}
+
+		$sync_result = get_transient( 'wkc_sync_result_' . get_current_user_id() );
+		if ( false !== $sync_result ) {
+			delete_transient( 'wkc_sync_result_' . get_current_user_id() );
+		}
+
+		$index_configured = Backend_Client::is_index_configured();
+		$pages            = Content_Sync::get_syncable_pages();
+		$categories       = Content_Sync::CATEGORIES;
+		?>
+		<div class="wrap">
+			<h1><?php esc_html_e( 'Knowledge Base Synchronization', 'wp-knowledge-chat' ); ?></h1>
+			<p class="description">
+				<?php esc_html_e( 'Sync published WordPress pages directly into the AI knowledge base. Content is cleaned (markup, Gutenberg blocks, and scripts removed) and vectorized by the AI backend.', 'wp-knowledge-chat' ); ?>
+			</p>
+
+			<?php if ( is_array( $sync_result ) && ! empty( $sync_result['message'] ) ) : ?>
+				<div class="notice <?php echo ! empty( $sync_result['success'] ) ? 'notice-success' : 'notice-error'; ?> is-dismissible">
+					<p><?php echo esc_html( $sync_result['message'] ); ?></p>
+				</div>
+			<?php endif; ?>
+
+			<?php if ( ! $index_configured ) : ?>
+				<div class="notice notice-warning">
+					<p>
+						<strong><?php esc_html_e( 'Sync not ready:', 'wp-knowledge-chat' ); ?></strong>
+						<?php esc_html_e( 'Define WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN in wp-config.php to enable synchronizing pages with the AI backend.', 'wp-knowledge-chat' ); ?>
+					</p>
+				</div>
+			<?php endif; ?>
+
+			<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post">
+				<input type="hidden" name="action" value="<?php echo esc_attr( self::SYNC_ACTION ); ?>" />
+				<?php wp_nonce_field( self::SYNC_ACTION, self::SYNC_NONCE ); ?>
+
+				<div class="tablenav top" style="display:flex;align-items:center;gap:12px;margin:12px 0;">
+					<button type="submit" name="sync_mode" value="selected" class="button button-primary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
+						<?php esc_html_e( 'Sync Selected Pages', 'wp-knowledge-chat' ); ?>
+					</button>
+					<button type="submit" name="sync_mode" value="all" class="button button-secondary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
+						<?php esc_html_e( 'Sync All Eligible Pages', 'wp-knowledge-chat' ); ?>
+					</button>
+					<label style="margin-left:auto;">
+						<input type="checkbox" name="replace_all" value="1" />
+						<?php esc_html_e( 'Replace entire backend knowledge base (prune unselected)', 'wp-knowledge-chat' ); ?>
+					</label>
+				</div>
+
+				<table class="wp-list-table widefat fixed striped">
+					<thead>
+						<tr>
+							<th scope="col" class="manage-column column-cb check-column" style="width:3em;">
+								<input type="checkbox" id="wkc-select-all" />
+							</th>
+							<th scope="col" class="manage-column column-primary"><?php esc_html_e( 'Page Title', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column" style="width:140px;"><?php esc_html_e( 'Category', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column" style="width:160px;"><?php esc_html_e( 'Content Size', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column" style="width:160px;"><?php esc_html_e( 'Last Modified', 'wp-knowledge-chat' ); ?></th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php if ( empty( $pages ) ) : ?>
+							<tr>
+								<td colspan="5"><?php esc_html_e( 'No published pages found.', 'wp-knowledge-chat' ); ?></td>
+							</tr>
+						<?php else : ?>
+							<?php foreach ( $pages as $page ) : ?>
+								<tr>
+									<th scope="row" class="check-column">
+										<input type="checkbox" name="page_ids[]" value="<?php echo esc_attr( (string) $page['id'] ); ?>" class="wkc-page-checkbox" <?php disabled( ! $page['eligible'] ); ?> <?php checked( $page['eligible'] ); ?> />
+									</th>
+									<td class="column-primary">
+										<strong>
+											<a href="<?php echo esc_url( get_edit_post_link( $page['id'] ) ?: $page['url'] ); ?>">
+												<?php echo esc_html( $page['title'] ); ?>
+											</a>
+										</strong>
+										<div class="row-actions">
+											<span><a href="<?php echo esc_url( $page['url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View', 'wp-knowledge-chat' ); ?></a></span>
+										</div>
+									</td>
+									<td>
+										<select name="categories[<?php echo esc_attr( (string) $page['id'] ); ?>]">
+											<?php foreach ( $categories as $cat ) : ?>
+												<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $page['category'], $cat ); ?>>
+													<?php echo esc_html( ucfirst( $cat ) ); ?>
+												</option>
+											<?php endforeach; ?>
+										</select>
+									</td>
+									<td>
+										<?php if ( $page['eligible'] ) : ?>
+											<span style="color:#007017;">
+												<?php
+												printf(
+													/* translators: %d: character count */
+													esc_html__( '%d chars (Ready)', 'wp-knowledge-chat' ),
+													(int) $page['char_count']
+												);
+												?>
+											</span>
+										<?php else : ?>
+											<span style="color:#b32d2e;">
+												<?php
+												printf(
+													/* translators: %d: character count */
+													esc_html__( '%d chars (Too short)', 'wp-knowledge-chat' ),
+													(int) $page['char_count']
+												);
+												?>
+											</span>
+										<?php endif; ?>
+									</td>
+									<td>
+										<?php echo esc_html( $page['modified'] ); ?>
+									</td>
+								</tr>
+							<?php endforeach; ?>
+						<?php endif; ?>
+					</tbody>
+					<tfoot>
+						<tr>
+							<th scope="col" class="manage-column column-cb check-column">
+								<input type="checkbox" id="wkc-select-all-bottom" />
+							</th>
+							<th scope="col" class="manage-column column-primary"><?php esc_html_e( 'Page Title', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column"><?php esc_html_e( 'Category', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column"><?php esc_html_e( 'Content Size', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column"><?php esc_html_e( 'Last Modified', 'wp-knowledge-chat' ); ?></th>
+						</tr>
+					</tfoot>
+				</table>
+
+				<div class="tablenav bottom" style="display:flex;align-items:center;gap:12px;margin:12px 0;">
+					<button type="submit" name="sync_mode" value="selected" class="button button-primary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
+						<?php esc_html_e( 'Sync Selected Pages', 'wp-knowledge-chat' ); ?>
+					</button>
+					<button type="submit" name="sync_mode" value="all" class="button button-secondary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
+						<?php esc_html_e( 'Sync All Eligible Pages', 'wp-knowledge-chat' ); ?>
+					</button>
+				</div>
+			</form>
+		</div>
+		<script>
+		document.addEventListener('DOMContentLoaded', function() {
+			var topAll = document.getElementById('wkc-select-all');
+			var botAll = document.getElementById('wkc-select-all-bottom');
+			var boxes = document.querySelectorAll('.wkc-page-checkbox:not(:disabled)');
+			function syncAll(checked) {
+				boxes.forEach(function(b) { b.checked = checked; });
+				if (topAll) topAll.checked = checked;
+				if (botAll) botAll.checked = checked;
+			}
+			if (topAll) topAll.addEventListener('change', function() { syncAll(this.checked); });
+			if (botAll) botAll.addEventListener('change', function() { syncAll(this.checked); });
+		});
+		</script>
+		<?php
+	}
+
+	public function handle_sync(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You do not have permission to do this.', 'wp-knowledge-chat' ), 403 );
+		}
+		check_admin_referer( self::SYNC_ACTION, self::SYNC_NONCE );
+
+		$sync_mode   = isset( $_POST['sync_mode'] ) ? sanitize_key( wp_unslash( $_POST['sync_mode'] ) ) : 'selected';
+		$replace_all = ! empty( $_POST['replace_all'] );
+
+		$category_map = array();
+		if ( isset( $_POST['categories'] ) && is_array( $_POST['categories'] ) ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- elements sanitized in loop.
+			$raw_categories = (array) wp_unslash( $_POST['categories'] );
+			foreach ( $raw_categories as $page_id => $cat ) {
+				$category_map[ (int) $page_id ] = sanitize_key( (string) $cat );
+			}
+		}
+
+		$page_ids = array();
+		if ( 'all' === $sync_mode ) {
+			$all_pages = Content_Sync::get_syncable_pages();
+			foreach ( $all_pages as $p ) {
+				if ( $p['eligible'] ) {
+					$page_ids[] = (int) $p['id'];
+				}
+			}
+		} elseif ( isset( $_POST['page_ids'] ) && is_array( $_POST['page_ids'] ) ) {
+			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- elements cast to (int) in loop.
+			$raw_page_ids = (array) wp_unslash( $_POST['page_ids'] );
+			foreach ( $raw_page_ids as $id ) {
+				$page_ids[] = (int) $id;
+			}
+		}
+
+		$result = Content_Sync::sync_pages( $page_ids, $category_map, $replace_all );
+		set_transient( 'wkc_sync_result_' . get_current_user_id(), $result, MINUTE_IN_SECONDS );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::SYNC_SLUG ) );
 		exit;
 	}
 }

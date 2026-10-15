@@ -1,0 +1,15 @@
+# Netlify configuration for WP Knowledge Chat AI Backend
+
+[build]
+  command = "cd backend && npm run build"
+  publish = "dist"
+
+[functions]
+  directory = "backend/dist/src/netlify"
+  node_bundler = "esbuild"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+
