@@ -1,10 +1,15 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { htmlToText } from '../src/lib/html-to-text.js';
+import { lineCoverage } from '../scripts/verify-sources.js';
 import {
   canonicalizeSourceUrl,
   chunkDocument,
   KnowledgeBaseStore,
+  readKnowledgeBaseFile,
   validateDocument,
 } from '../src/services/knowledge-base.js';
 import { Bm25Retriever } from '../src/services/retrieval.js';
@@ -57,6 +62,46 @@ describe('validateDocument', () => {
     assert.throws(() => validateDocument({ ...valid, category: 'secret' }, HOSTS), /category must be/);
     assert.throws(() => validateDocument({ ...valid, updated_at: 'yesterday' }, HOSTS), /updated_at/);
     assert.throws(() => validateDocument(null, HOSTS), /must be an object/);
+  });
+});
+
+describe('readKnowledgeBaseFile', () => {
+  it('reads the configured file and refuses to fall back when it exists but is corrupt', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'wkc-kbread-'));
+    const good = join(dir, 'kb.json');
+    await writeFile(good, JSON.stringify({ version: 1, generated_at: '2026-10-15T00:00:00Z', documents: FIXTURE_DOCS }));
+    assert.equal(((await readKnowledgeBaseFile(good)) as { documents: unknown[] }).documents.length, FIXTURE_DOCS.length);
+
+    const corrupt = join(dir, 'corrupt.json');
+    await writeFile(corrupt, '{"documents": [');
+    // Previously a parse error moved on to backend/data/kb.json (a different snapshot) without telling anyone.
+    await assert.rejects(readKnowledgeBaseFile(corrupt), SyntaxError);
+  });
+
+  it('prefers the configured file over a copy left in the temporary directory', async () => {
+    const tmpCopy = join(tmpdir(), 'wkc-kb.json');
+    const existing = await readFile(tmpCopy, 'utf8').catch(() => null);
+    await writeFile(tmpCopy, JSON.stringify({ version: 1, generated_at: '2020-01-01T00:00:00Z', documents: [] }));
+    try {
+      const dir = await mkdtemp(join(tmpdir(), 'wkc-kbread-'));
+      const configured = join(dir, 'kb.json');
+      await writeFile(configured, JSON.stringify({ version: 1, generated_at: '2026-10-15T00:00:00Z', documents: FIXTURE_DOCS }));
+      assert.equal(((await readKnowledgeBaseFile(configured)) as { documents: unknown[] }).documents.length, FIXTURE_DOCS.length);
+    } finally {
+      if (existing === null) await rm(tmpCopy, { force: true });
+      else await writeFile(tmpCopy, existing);
+    }
+  });
+});
+
+describe('verify-sources lineCoverage', () => {
+  it('matches knowledge-base lines against page text regardless of case, bullets and punctuation', () => {
+    const page = 'Home | Partner Identification — Source and shortlist relevant distributors, resellers, and channel partners. Footer';
+    const doc = 'Partner Identification\n- Source and shortlist relevant distributors, resellers and channel partners.\nProject portfolio: 90+ completed advisory projects.';
+    const cov = lineCoverage(doc, page);
+    assert.equal(cov.checked, 2, 'short lines are not checked');
+    assert.equal(cov.found, 1);
+    assert.deepEqual(cov.missing, ['Project portfolio: 90+ completed advisory projects.']);
   });
 });
 

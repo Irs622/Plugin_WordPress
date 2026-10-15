@@ -292,9 +292,9 @@ describe('POST /api/index', () => {
     try {
       const res = await postIndex(t.url, { documents: [newDoc] });
       assert.equal(res.status, 200);
-      assert.deepEqual(await res.json(), { upserted: 1, unchanged: 0, deleted: 0, total: 4 });
+      assert.deepEqual(await res.json(), { upserted: 1, unchanged: 0, deleted: 0, total: 4, persisted: 'file' });
       const again = await postIndex(t.url, { documents: [newDoc] });
-      assert.deepEqual(await again.json(), { upserted: 0, unchanged: 1, deleted: 0, total: 4 });
+      assert.deepEqual(await again.json(), { upserted: 0, unchanged: 1, deleted: 0, total: 4, persisted: 'file' });
 
       const saved = JSON.parse(await readFile(t.config.kbPath, 'utf8')) as { documents: { id: string }[] };
       assert.ok(saved.documents.some((d) => d.id === 'page-9-faq'));
@@ -303,7 +303,21 @@ describe('POST /api/index', () => {
       assert.equal(((await chat.json()) as { sources: { url: string }[] }).sources[0]?.url, 'https://inpartnerglobal.com/faq/');
 
       const del = await postIndex(t.url, { delete_ids: ['page-9-faq'] });
-      assert.deepEqual(await del.json(), { upserted: 0, unchanged: 0, deleted: 1, total: 3 });
+      assert.deepEqual(await del.json(), { upserted: 0, unchanged: 0, deleted: 1, total: 3, persisted: 'file' });
+    } finally {
+      await t.close();
+    }
+  });
+
+  it('refuses runtime updates on multi-instance (serverless) deployments instead of half-applying them', async () => {
+    const t = await startTestServer({ indexingEnabled: false });
+    try {
+      const res = await postIndex(t.url, { delete_ids: ['page-2-distribution'] });
+      assert.equal(res.status, 501);
+      assert.equal(((await res.json()) as { error: { code: string } }).error.code, 'index_unsupported');
+      assert.ok(t.store.get('page-2-distribution'), 'store unchanged');
+      const unauth = await postIndex(t.url, { delete_ids: ['page-2-distribution'] }, 'x'.repeat(40));
+      assert.equal(unauth.status, 401, 'authentication is still checked first');
     } finally {
       await t.close();
     }

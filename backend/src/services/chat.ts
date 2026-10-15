@@ -185,12 +185,28 @@ export interface ChatServiceOptions {
   secrets: readonly string[];
   /** Consumed once per model call (not per request), so questions answered without the model cost no budget. */
   budget?: { consume(): LimitResult };
+  now?: () => number;
 }
+
+/**
+ * After the provider reports quota exhaustion (429) or a rejected key, further
+ * calls in the next few seconds would fail the same way: each one would cost
+ * a round trip (plus a retry) and add load to an already limiting provider.
+ * The breaker fails those requests immediately instead, without using budget.
+ */
+export const PROVIDER_COOLDOWN_MS: Partial<Record<LlmError['kind'], number>> = { rate_limited: 30_000, auth: 300_000 };
 
 export type ChatResult = ChatAnswer & { outcome: ChatOutcome; reason?: string };
 
 export class ChatService {
+  private providerOpenUntil = 0;
+  private providerOpenKind: LlmError['kind'] = 'unavailable';
+
   constructor(private readonly options: ChatServiceOptions) {}
+
+  private now(): number {
+    return this.options.now ? this.options.now() : Date.now();
+  }
 
   async answer(message: string, language: Language, history?: ChatHistoryTurn[]): Promise<ChatResult> {
     const fallback = (outcome: ChatOutcome, reason?: string): ChatResult => ({
@@ -219,6 +235,8 @@ export class ChatService {
     const missing = missingAnswerType(message, evidenceText);
     if (missing) return fallback('missing_answer_type', missing);
 
+    if (this.now() < this.providerOpenUntil) throw new LlmError(this.providerOpenKind);
+
     if (this.options.budget) {
       const budget = this.options.budget.consume();
       if (!budget.allowed) throw new BudgetExceededError(budget.retryAfterSeconds);
@@ -233,6 +251,12 @@ export class ChatService {
     } catch (err) {
       // A safety block is about this question, not an outage: answer with the fallback.
       if (err instanceof LlmError && err.kind === 'blocked') return fallback('provider_blocked');
+      const cooldown = err instanceof LlmError ? PROVIDER_COOLDOWN_MS[err.kind] : undefined;
+      if (err instanceof LlmError && cooldown) {
+        this.providerOpenUntil = this.now() + cooldown;
+        this.providerOpenKind = err.kind;
+        this.options.logger.warn('provider_cooldown', { kind: err.kind, seconds: cooldown / 1000 });
+      }
       // Other LlmErrors propagate to the route, which maps them to 502/504.
       throw err;
     }

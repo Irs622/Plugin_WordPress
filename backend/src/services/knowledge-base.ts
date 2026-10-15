@@ -268,28 +268,44 @@ export class KnowledgeBaseStore {
 
 const FALLBACK_TMP_PATH = join(tmpdir(), 'wkc-kb.json');
 
+function isMissingFile(err: unknown): boolean {
+  return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'ENOENT';
+}
+
+/**
+ * Reads the knowledge base from the configured path. Relative paths are also
+ * tried against the working directory and `backend/` (serverless bundles run
+ * from the repository root). Only a *missing* file moves on to the next
+ * candidate: a file that exists but cannot be parsed is an error, so a corrupt
+ * kb.json never silently falls back to a different snapshot.
+ *
+ * The temporary-directory copy written on read-only file systems is consulted
+ * last, never in preference to the configured file: /tmp is shared and
+ * outlives deployments, so a stale or planted copy must not override the
+ * reviewed snapshot.
+ */
 export async function readKnowledgeBaseFile(path: string): Promise<unknown> {
-  if (path !== FALLBACK_TMP_PATH) {
-    try {
-      return JSON.parse(await readFile(FALLBACK_TMP_PATH, 'utf8'));
-    } catch {
-      // Fall through to requested path
-    }
-  }
   const candidatePaths = [
-    path,
-    join(process.cwd(), path),
-    join(process.cwd(), 'backend', path),
-    join(process.cwd(), 'data/kb.json'),
-    join(process.cwd(), 'backend/data/kb.json'),
+    ...new Set([
+      path,
+      join(process.cwd(), path),
+      join(process.cwd(), 'backend', path),
+      join(process.cwd(), 'data/kb.json'),
+      join(process.cwd(), 'backend/data/kb.json'),
+      FALLBACK_TMP_PATH,
+    ]),
   ];
   let lastError: unknown;
   for (const candidate of candidatePaths) {
+    let raw: string;
     try {
-      return JSON.parse(await readFile(candidate, 'utf8'));
+      raw = await readFile(candidate, 'utf8');
     } catch (err) {
       lastError = err;
+      if (isMissingFile(err)) continue;
+      throw err;
     }
+    return JSON.parse(raw);
   }
   throw lastError;
 }
@@ -301,14 +317,19 @@ async function writeAtomic(path: string, data: KnowledgeBaseFile): Promise<void>
   await rename(tmp, path);
 }
 
-/** Atomic write: a crash mid-write never leaves a truncated knowledge base. */
-export async function writeKnowledgeBaseFile(path: string, data: KnowledgeBaseFile): Promise<void> {
+/**
+ * Atomic write: a crash mid-write never leaves a truncated knowledge base.
+ * On a read-only file system the copy goes to the temporary directory and the
+ * result says so: that copy is not durable (lost on restart or redeploy).
+ */
+export async function writeKnowledgeBaseFile(path: string, data: KnowledgeBaseFile): Promise<{ durable: boolean }> {
   try {
     await writeAtomic(path, data);
+    return { durable: true };
   } catch (err) {
     if (err && typeof err === 'object' && (err as { code?: string }).code === 'EROFS') {
       await writeAtomic(FALLBACK_TMP_PATH, data);
-      return;
+      return { durable: false };
     }
     throw err;
   }

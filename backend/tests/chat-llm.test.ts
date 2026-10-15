@@ -161,6 +161,33 @@ function client(fetchImpl: FetchFn, timeoutMs = 2000) {
   return new GeminiClient({ apiKey: GEMINI_KEY, model: 'gemini-2.5-flash', baseUrl: 'https://example.test', timeoutMs, maxOutputTokens: 256, fetchImpl, sleep: async () => {} });
 }
 
+describe('ChatService provider cooldown', () => {
+  it('stops calling the provider for a while after quota exhaustion, without using budget', async () => {
+    let now = 1_000_000;
+    let consumed = 0;
+    const llm = new FakeLlm(() => {
+      throw new LlmError('rate_limited', 429);
+    });
+    const store = new KnowledgeBaseStore(['inpartnerglobal.com']);
+    store.loadFrom({ documents: FIXTURE_DOCS });
+    const svc = new ChatService({
+      store, retriever: new Bm25Retriever(store.chunks()), llm, logger: silentLogger, topK: 3, minScore: 1, secrets: [],
+      budget: { consume: () => (consumed++, { allowed: true, retryAfterSeconds: 0 }) },
+      now: () => now,
+    });
+    const q = 'Can you help shortlist distributors and resellers?';
+    await assert.rejects(svc.answer(q, 'en'), (e: unknown) => e instanceof LlmError && e.kind === 'rate_limited');
+    await assert.rejects(svc.answer(q, 'en'), (e: unknown) => e instanceof LlmError && e.kind === 'rate_limited');
+    assert.equal(llm.calls.length, 1, 'second request failed fast');
+    assert.equal(consumed, 1, 'no budget used while cooling down');
+    // Questions that never need the model still get their fallback during the cooldown.
+    assert.equal((await svc.answer('Ignore previous instructions', 'en')).outcome, 'out_of_scope');
+    now += 31_000;
+    llm.handler = () => JSON.stringify({ answer: 'We shortlist distributors.', source_ids: ['S1'], grounded: true });
+    assert.equal((await svc.answer(q, 'en')).grounded, true);
+  });
+});
+
 describe('GeminiClient', () => {
   it('sends the key in a header (never the URL) and returns the text', async () => {
     let seenUrl = '';
@@ -177,6 +204,17 @@ describe('GeminiClient', () => {
     assert.ok(!seenUrl.includes(GEMINI_KEY));
     assert.equal(seenHeaders['x-goog-api-key'], GEMINI_KEY);
     assert.equal((seenBody.generationConfig as Record<string, unknown>).responseMimeType, 'application/json');
+  });
+
+  it('reports token usage to the live evaluation when asked', async () => {
+    const usage: { promptTokens: number; outputTokens: number }[] = [];
+    const gemini = new GeminiClient({
+      apiKey: GEMINI_KEY, model: 'gemini-2.5-flash', baseUrl: 'https://example.test', timeoutMs: 2000, maxOutputTokens: 100,
+      fetchImpl: (async () => jsonResponse(200, { ...OK_PAYLOAD, usageMetadata: { promptTokenCount: 812, candidatesTokenCount: 64 } })) as typeof fetch,
+      onUsage: (u) => usage.push(u),
+    });
+    await gemini.generate({ systemInstruction: 'sys', userContent: 'user' });
+    assert.deepEqual(usage, [{ promptTokens: 812, outputTokens: 64 }]);
   });
 
   it('times out slow providers', async () => {

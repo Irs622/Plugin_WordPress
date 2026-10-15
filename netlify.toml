@@ -1,6 +1,6 @@
 [build]
   command = "cd backend && npm run build"
-  publish = "backend/dist"
+  publish = "backend/public"  # static placeholder only; never publish dist/ (compiled sources, eval data)
 
 [functions]
   directory = "backend/dist/src/netlify"

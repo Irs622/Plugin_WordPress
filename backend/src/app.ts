@@ -18,9 +18,11 @@ export interface AppDeps {
   llm: LlmClient;
   logger: Logger;
   now?: () => number;
+  /** False on serverless/multi-instance hosts (see routes/index.ts). */
+  indexingEnabled?: boolean;
 }
 
-export function createApp({ config, store, llm, logger, now = () => Date.now() }: AppDeps): RequestListener {
+export function createApp({ config, store, llm, logger, now = () => Date.now(), indexingEnabled = true }: AppDeps): RequestListener {
   const retriever = new Bm25Retriever(store.chunks());
   const chat = new ChatService({
     store,
@@ -31,6 +33,7 @@ export function createApp({ config, store, llm, logger, now = () => Date.now() }
     minScore: config.retrievalMinScore,
     secrets: [config.geminiApiKey, config.chatSharedSecret, config.indexApiToken],
     budget: new DailyBudget(config.dailyRequestLimit, now),
+    now,
   });
   const verifier = new SignatureVerifier(config.chatSharedSecret, config.signatureMaxSkewSeconds, now);
 
@@ -53,6 +56,7 @@ export function createApp({ config, store, llm, logger, now = () => Date.now() }
     limiter: new FixedWindowLimiter(30, 60_000, now),
     logger,
     lock: createLock(),
+    indexingEnabled,
   };
 
   const routes: Record<string, { method: string; handle: (req: IncomingMessage, res: ServerResponse) => Promise<void> | void }> = {

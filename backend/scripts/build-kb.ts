@@ -113,7 +113,8 @@ async function main(): Promise<void> {
   for (const warning of audit.warnings) console.warn(`WARN ${warning}`);
   if (audit.errors.length > 0) throw new Error(`audit failed; ${outPath} was not changed:\n  ${audit.errors.join('\n  ')}`);
 
-  await writeKnowledgeBaseFile(outPath, file);
+  const { durable } = await writeKnowledgeBaseFile(outPath, file);
+  if (!durable) throw new Error(`${outPath} is on a read-only file system; the snapshot was only written to the temporary directory`);
   console.log(`Wrote ${documents.length} documents (${store.chunks().length} chunks) to ${outPath}`);
 }
 

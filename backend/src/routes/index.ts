@@ -25,6 +25,12 @@ export interface IndexRouteDeps {
   logger: Logger;
   /** Serialises writes so concurrent index calls cannot interleave. */
   lock: { run<T>(fn: () => Promise<T>): Promise<T> };
+  /**
+   * False on multi-instance/serverless hosts: an update would reach only the
+   * instance that handled the request (others keep serving removed content)
+   * and is lost on the next cold start.
+   */
+  indexingEnabled?: boolean;
 }
 
 export function createLock(): IndexRouteDeps['lock'] {
@@ -94,6 +100,14 @@ export async function handleIndex(req: IncomingMessage, res: ServerResponse, dep
     deps.logger.warn('index_auth_failed');
     throw new HttpError(401, 'unauthorized', 'Request is not authorised.', { 'WWW-Authenticate': 'Bearer' });
   }
+  if (deps.indexingEnabled === false) {
+    req.resume();
+    throw new HttpError(
+      501,
+      'index_unsupported',
+      'This deployment cannot apply knowledge-base updates at runtime (multi-instance host). Rebuild data/kb.json and redeploy.',
+    );
+  }
   const limit = deps.limiter.hit('index');
   if (!limit.allowed) {
     req.resume();
@@ -111,15 +125,17 @@ export async function handleIndex(req: IncomingMessage, res: ServerResponse, dep
       if (err instanceof DocumentValidationError) throw new HttpError(422, 'invalid_document', err.message);
       throw err;
     }
+    let persisted: { durable: boolean };
     try {
-      await writeKnowledgeBaseFile(deps.kbPath, deps.store.toFile());
+      persisted = await writeKnowledgeBaseFile(deps.kbPath, deps.store.toFile());
     } catch (err) {
       deps.store.loadFrom(before);
       deps.logger.error('kb_persist_failed', { error: err instanceof Error ? err.name : 'unknown' });
       throw new HttpError(500, 'persist_failed', 'The knowledge base could not be saved. No changes were applied.');
     }
     deps.retriever.rebuild(deps.store.chunks());
-    return { ...counts, total: deps.store.size };
+    if (!persisted.durable) deps.logger.warn('kb_persisted_ephemeral');
+    return { ...counts, total: deps.store.size, persisted: persisted.durable ? 'file' : 'ephemeral' };
   });
 
   deps.logger.info('kb_indexed', result);

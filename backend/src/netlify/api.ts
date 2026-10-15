@@ -32,7 +32,11 @@ async function getApp(): Promise<RequestListener> {
       maxOutputTokens: config.geminiMaxOutputTokens,
     });
 
-    return createApp({ config, store, llm, logger });
+    // Each function instance keeps its own memory and /tmp: runtime index updates would not reach the
+    // other instances and would vanish on cold start, so /api/index is disabled here (501). Rate limits,
+    // the replay cache and the daily budget are per instance too; see docs/deployment.md.
+    logger.warn('serverless_single_instance_assumptions', { index: 'disabled' });
+    return createApp({ config, store, llm, logger, indexingEnabled: false });
   })();
 
   return appPromise;

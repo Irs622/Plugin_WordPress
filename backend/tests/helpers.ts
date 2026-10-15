@@ -83,13 +83,14 @@ export async function startTestServer(options: {
   llm?: LlmClient;
   docs?: KnowledgeDocument[];
   now?: () => number;
+  indexingEnabled?: boolean;
 } = {}): Promise<TestServer> {
   const dir = await mkdtemp(join(tmpdir(), 'wkc-test-'));
   const config = testConfig({ KB_PATH: join(dir, 'kb.json'), ...options.env });
   const store = new KnowledgeBaseStore(config.allowedSourceHosts);
   store.loadFrom({ documents: options.docs ?? FIXTURE_DOCS });
   const llm = (options.llm as FakeLlm) ?? new FakeLlm();
-  const server = createServer(createApp({ config, store, llm, logger: silentLogger, now: options.now }));
+  const server = createServer(createApp({ config, store, llm, logger: silentLogger, now: options.now, indexingEnabled: options.indexingEnabled }));
   await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
   const { port } = server.address() as AddressInfo;
   return {
