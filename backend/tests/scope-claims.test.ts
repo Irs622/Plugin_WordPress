@@ -58,6 +58,26 @@ describe('scopeViolation', () => {
     for (const [question, kind] of cases) assert.equal(scopeViolation(question), kind, question);
   });
 
+  it('flags indirect taxes, capital requirements, contract review and sport (audit 2026-10-15)', () => {
+    const cases: [string, string][] = [
+      ['What is the VAT rate for imported goods in Indonesia?', 'legal_tax_advice'],
+      ['How much import duty applies to electronics?', 'legal_tax_advice'],
+      ['Berapa tarif bea masuk untuk mesin?', 'legal_tax_advice'],
+      ['수입품 관세율은 얼마인가요?', 'legal_tax_advice'],
+      ['What is the minimum capital requirement for a foreign company in Indonesia?', 'legal_tax_advice'],
+      ['Berapa modal disetor minimum untuk perusahaan asing?', 'legal_tax_advice'],
+      ['외국 기업의 최소 자본금은 얼마인가요?', 'legal_tax_advice'],
+      ['Can you review my distribution contract for legal risks?', 'legal_tax_advice'],
+      ['Could you check our agreement with the supplier?', 'legal_tax_advice'],
+      ['Bisakah Anda periksa kontrak distribusi kami?', 'legal_tax_advice'],
+      ['제 유통 계약서를 검토해 주실 수 있나요?', 'legal_tax_advice'],
+      ['Who won the football match last night?', 'unrelated'],
+      ['Siapa juara sepak bola tadi malam?', 'unrelated'],
+      ['어제 축구 경기 누가 이겼어요?', 'unrelated'],
+    ];
+    for (const [question, kind] of cases) assert.equal(scopeViolation(question), kind, question);
+  });
+
   it('does not flag legitimate questions about Inpartner (false-positive regressions)', () => {
     for (const question of [
       'What services does Inpartner offer?',
@@ -75,6 +95,10 @@ describe('scopeViolation', () => {
       '의사결정을 지원해 주시나요?', // "의사결정" (decision-making) is not medical
       'Inpartner의 역할은 무엇인가요?',
       '시장 진출 전략을 작성하는 데 도움을 주시나요?',
+      'Can you help us structure commercial agreements with distributors?', // a listed service, not contract review
+      'Do you help negotiate pricing terms and exclusivity with partners?',
+      'Do you support investment and project advisory?',
+      'Can you match us with a distribution partner?', // "match" is not sport
     ]) {
       assert.equal(scopeViolation(question), null, question);
     }
@@ -103,6 +127,35 @@ describe('missingAnswerType', () => {
       ['영업시간이 어떻게 되나요?', 'hours'],
     ];
     for (const [question, type] of cases) assert.equal(missingAnswerType(question, evidence), type, question);
+  });
+
+  it('does not treat "pricing terms" or "portfolio" as prices or client names (KB v2.0 regression)', () => {
+    const kbV2 = 'Negotiation Support: Structure commercial agreements, pricing terms, distribution exclusivity, and governance.\n' +
+      'Project Portfolio: 90+ completed and ongoing advisory projects.\nOfficial Service Portfolio: Strategy & Corporate Advisory.';
+    for (const [question, type] of [
+      ['Pricing?', 'price'],
+      ['How much do your services cost?', 'price'],
+      ['Berapa tarif jasa distribution partner sourcing?', 'price'],
+      ['자문 서비스 비용은 얼마인가요?', 'price'],
+      ["Who are Inpartner's clients?", 'clients'],
+      ['Do you have testimonials from past clients?', 'clients'],
+      ['Can you name some companies you have helped?', 'clients'],
+    ] as const) {
+      assert.equal(missingAnswerType(question, kbV2), type, question);
+    }
+    // ...while questions about the service itself still reach the model.
+    assert.equal(missingAnswerType('Do you help negotiate pricing terms with distributors?', kbV2), null);
+  });
+
+  it('requires the asked-for office location on an office line of the evidence', () => {
+    const contact = 'Contact Us\n- Office: Pakuwon Tower Unit J 10th Floor, South Jakarta, Indonesia\nGlobal reach across Indonesia, Singapore, Qatar.';
+    assert.equal(missingAnswerType('Does Inpartner have an office in London?', contact), 'office_location');
+    assert.equal(missingAnswerType('Do you have an office in Singapore?', contact), 'office_location', 'listed as reach, not as an office');
+    assert.equal(missingAnswerType('Apakah ada kantor di Surabaya?', contact), 'office_location');
+    assert.equal(missingAnswerType('Do you have an office in Jakarta?', contact), null);
+    assert.equal(missingAnswerType('Where is your office in Indonesia?', contact), null);
+    assert.equal(missingAnswerType('Do you have offices in other countries?', contact), null, 'no place named');
+    assert.equal(missingAnswerType('Where is your office?', contact), null);
   });
 
   it('opens once the evidence contains that kind of fact', () => {
@@ -143,6 +196,25 @@ describe('unsupportedClaims', () => {
     assert.deepEqual(unsupportedClaims('Pay at https://evil.example/pay', evidence), ['url']);
     assert.deepEqual(unsupportedClaims('Write to sales@inpartner-deals.com', evidence), ['email']);
     assert.deepEqual(unsupportedClaims('Call +62 896 2831 0192.', evidence), ['phone']);
+  });
+
+  it('flags people, companies and places that the evidence never names', () => {
+    assert.deepEqual(unsupportedClaims('Inpartner was founded by John Smith.', evidence), ['name']);
+    assert.deepEqual(unsupportedClaims('Our clients include PT Maju Jaya and Acme Holdings.', evidence), ['name']);
+    assert.deepEqual(unsupportedClaims('We also have a team in Kuala Lumpur.', evidence), ['name']);
+  });
+
+  it('accepts service names, sentence starters and common words (name-check false positives)', () => {
+    const svc = 'Distribution Partner Sourcing Advisory\nStrategy & Corporate Advisory\nPakuwon Tower, South Jakarta, Indonesia';
+    for (const answer of [
+      'Certainly! Inpartner provides Distribution Partner Sourcing Advisory.',
+      'Yes, Inpartner offers Strategy & Corporate Advisory. Our team can help.',
+      'Of course. In General, our office is at Pakuwon Tower in South Jakarta.',
+      'Tentu! Inpartner menyediakan layanan Distribution Partner Sourcing Advisory.',
+      'Inpartner는 Distribution Partner Sourcing Advisory 서비스를 제공합니다.',
+    ]) {
+      assert.deepEqual(unsupportedClaims(answer, svc), [], answer);
+    }
   });
 });
 

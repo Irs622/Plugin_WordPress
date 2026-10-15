@@ -30,6 +30,8 @@ export interface GeminiOptions {
   maxOutputTokens: number;
   fetchImpl?: typeof fetch;
   sleep?: (ms: number) => Promise<void>;
+  /** Receives token counts from each successful provider response (used by the live evaluation for cost). */
+  onUsage?: (usage: { promptTokens: number; outputTokens: number }) => void;
 }
 
 /** JSON schema the model must follow; parsed and re-validated by the caller regardless. */
@@ -188,6 +190,13 @@ export class GeminiClient implements LlmClient {
         payload = JSON.parse(text);
       } catch {
         throw new LlmError('bad_response');
+      }
+      if (this.options.onUsage) {
+        const usage = (payload as { usageMetadata?: { promptTokenCount?: unknown; candidatesTokenCount?: unknown } })?.usageMetadata;
+        this.options.onUsage({
+          promptTokens: typeof usage?.promptTokenCount === 'number' ? usage.promptTokenCount : 0,
+          outputTokens: typeof usage?.candidatesTokenCount === 'number' ? usage.candidatesTokenCount : 0,
+        });
       }
       return extractText(payload);
     } finally {

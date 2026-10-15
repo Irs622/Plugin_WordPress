@@ -76,11 +76,19 @@ const SCOPE_RULES: { kind: ScopeViolation; patterns: RegExp[] }[] = [
     kind: 'legal_tax_advice',
     patterns: [
       /\b(tax(es|ation)?|pajak|pph|ppn)\b/i,
+      // Indirect taxes and duties: "VAT rate for imported goods" is a tax question without the word "tax".
+      /\b(vat|gst|value[- ]added tax|customs dut(y|ies)|import dut(y|ies)|excise|bea (masuk|cukai)|cukai)\b/i,
+      // Statutory capital requirements are regulatory facts the site does not publish.
+      /\b(minimum|paid[- ]up)\s+(capital|investment)\b|\bcapital requirements?\b|\bmodal (minimum|minimal|disetor)\b/i,
+      // Reviewing a visitor's own contract is legal advice; structuring agreements (a listed service) is not matched.
+      /\blegal (risks?|review|opinion|issues?)\b|\b(review|check|vet)\b[^.?!]{0,30}\b(my|our)\b[^.?!]{0,20}\b(contracts?|agreements?)\b/i,
+      /\brisiko hukum\b|\b(periksa|tinjau|cek)\b[^.?!]{0,30}\b(kontrak|perjanjian)\b/i,
       /\b(legal advice|lawyer|attorney|lawsuit|litigation|is it legal|legally)\b/i,
       /\b(register|incorporate|set up|form)\b[^.?!]{0,30}\b(a |an |my |our )?(company|pt|entity|legal entity|subsidiary)\b/i,
       /\bpt\s?pma\b|\bkbli\b|\boss[\s-]?rba\b/i,
       /\b(mendirikan|mendaftarkan)\b[^.?!]{0,20}\b(pt|perusahaan|badan usaha)\b/i,
-      /세금|세무|법인세|부가세|소득세/,
+      /세금|세무|법인세|부가세|부가가치세|소득세|관세/,
+      /최소\s?자본금|자본금\s?(요건|기준)|법적\s?(리스크|위험|검토)|계약서[^.?!]{0,15}(검토|확인)/,
       /법률\s?(자문|상담|조언)|변호사|소송|합법(인가|적인가|일까)/,
       /(법인|회사|현지\s?법인)\s?(설립|등록)/,
     ],
@@ -99,7 +107,8 @@ const SCOPE_RULES: { kind: ScopeViolation; patterns: RegExp[] }[] = [
       /\b(weather|cuaca|recipe|resep|joke|lelucon|poem|puisi|lyrics|horoscope|zodiac)\b/i,
       /\b(write|draft|compose|generate|create)\b[^.?!]{0,20}\b(poem|essay|story|code|script|business plan|cover letter|resume|cv|article)\b/i,
       /\b(buatkan|tuliskan|tulis)\b[^.?!]{0,20}\b(puisi|esai|cerita|kode|rencana bisnis|surat)\b/i,
-      /날씨|레시피|요리법|농담|운세|별자리/,
+      /\b(football|soccer|basketball|baseball|cricket|world cup|premier league|champions league|sepak ?bola|bulu ?tangkis)\b/i,
+      /날씨|레시피|요리법|농담|운세|별자리|축구|야구|농구|월드컵/,
       /(시를|에세이|소설|이야기를|코드를|사업\s?계획서|자기소개서|이력서)[^.?!]{0,10}(써|작성)/,
     ],
   },
@@ -113,13 +122,16 @@ export function scopeViolation(question: string): ScopeViolation | null {
   return null;
 }
 
-export type AnswerType = 'price' | 'founding' | 'headcount' | 'statistics' | 'clients' | 'hours';
+export type AnswerType = 'price' | 'founding' | 'headcount' | 'statistics' | 'clients' | 'hours' | 'office_location';
 
 const ANSWER_TYPE_RULES: { type: AnswerType; question: RegExp; evidence: RegExp }[] = [
   {
     type: 'price',
-    question: /\b(price[sd]?|pricing|fees?|how much|quotes?|rate card|biaya|harga|tarif|ongkos)\b|\b(what|how)\b[^.?!]{0,25}\bcosts?\b|\bcosts? (of|for) (your|the|inpartner|a|an)\b|가격|비용|요금|수수료|얼마|견적/i,
-    evidence: /\b(rp|idr|usd|sgd|eur)\.?\s?\d|[$€£]\s?\d|\bpricing\b|\bfees?\b/i,
+    // "pricing terms" / "pricing strategy" are negotiation topics (a listed service), not a request for Inpartner's prices.
+    question: /\b(price[sd]?|pricing(?!\s+(terms?|strateg\w*|models?|negotiations?))|fees?|how much|quotes?|rate card|biaya|harga|tarif|ongkos)\b|\b(what|how)\b[^.?!]{0,25}\bcosts?\b|\bcosts? (of|for) (your|the|inpartner|a|an)\b|가격|비용|요금|수수료|얼마|견적/i,
+    // A price needs an amount. The words "pricing"/"fees" alone are not one: KB v2.0 says
+    // "Structure commercial agreements, pricing terms, ..." which opened the gate for every fee question.
+    evidence: /\b(rp|idr|usd|sgd|eur|krw)\.?\s?\d|[$€£₩]\s?\d|\b(fees?|pricing|prices?|rates?|tarif|biaya|harga)\b[^.\n]{0,40}\d/i,
   },
   {
     type: 'founding',
@@ -139,8 +151,10 @@ const ANSWER_TYPE_RULES: { type: AnswerType; question: RegExp; evidence: RegExp 
   },
   {
     type: 'clients',
-    question: /\b(who are|list|name)\b[^.?!]{0,30}\b(clients|customers)\b|\b(clients?|customers?)\s+(list|names?|portfolio)\b|\bcase stud(y|ies)\b|\btestimonials?\b|\bportfolio\b|\bstudi kasus\b|\btestimoni\b|\b(siapa( saja)?|daftar|nama)\s+klien\b|고객\s?(목록|명단|리스트)|고객사\s?(이름|목록|명단)|(주요|대표)\s?고객|사례\s?연구|포트폴리오|후기/i,
-    evidence: /\b(case stud(y|ies)|testimonials?|portfolio|our clients include|clients include|trusted by)\b/i,
+    question: /\b(who are|list|name)\b[^.?!]{0,30}\b(clients|customers)\b|\b(name|list)\b[^.?!]{0,30}\b(companies|firms|brands|businesses)\b[^.?!]{0,30}\b(helped|worked with|served|advised)\b|\b(clients?|customers?)\s+(list|names?|portfolio)\b|\bcase stud(y|ies)\b|\btestimonials?\b|\bportfolio\b|\bstudi kasus\b|\btestimoni\b|\b(siapa( saja)?|daftar|nama)\s+klien\b|고객\s?(목록|명단|리스트)|고객사\s?(이름|목록|명단)|(주요|대표)\s?고객|사례\s?연구|포트폴리오|후기/i,
+    // Client names, not counts: "Project Portfolio: 90+ projects" and "Official Service Portfolio" (KB v2.0)
+    // matched the former bare "portfolio" and let "Who are your clients?" through.
+    evidence: /\b(case stud(y|ies)|testimonials?|our clients include|clients include|clients such as|trusted by)\b/i,
   },
   {
     type: 'hours',
@@ -149,11 +163,35 @@ const ANSWER_TYPE_RULES: { type: AnswerType; question: RegExp; evidence: RegExp 
   },
 ];
 
+const OFFICE_PLACE_RES: RegExp[] = [
+  /\b(?:offices?|branch(?:es)?|representative office|presence)\s+(?:in|at)\s+((?:[\p{L}][\p{L}-]*)(?:\s+[\p{Lu}][\p{L}-]*)?)/iu,
+  /\bkantor(?:\s+cabang)?\s+di\s+((?:[\p{L}][\p{L}-]*)(?:\s+[\p{Lu}][\p{L}-]*)?)/iu,
+];
+const NOT_A_PLACE = new Set(['the', 'your', 'our', 'a', 'an', 'any', 'which', 'what', 'other', 'another', 'many', 'multiple', 'several', 'other countries', 'mana', 'negara', 'luar']);
+const OFFICE_EVIDENCE_LINE = /\b(office|kantor|address|alamat|headquarters?|tower|located)\b/i;
+
+/**
+ * "Do you have an office in London?" retrieves the contact page (it mentions
+ * an office) although London appears nowhere: the place must be named on an
+ * office/address line of the evidence. Latin-script place names only; Korean
+ * place names are not mapped, so Korean questions skip this check.
+ */
+function missingOfficeLocation(question: string, evidenceText: string): boolean {
+  for (const re of OFFICE_PLACE_RES) {
+    const place = re.exec(question)?.[1]?.trim().toLowerCase();
+    if (!place || NOT_A_PLACE.has(place) || NOT_A_PLACE.has(place.split(/\s+/)[0] ?? '')) continue;
+    const lines = evidenceText.toLowerCase().split('\n');
+    return !lines.some((line) => line.includes(place) && OFFICE_EVIDENCE_LINE.test(line));
+  }
+  return false;
+}
+
 /** Returns the first answer type the question asks for that the evidence cannot supply, or null. */
 export function missingAnswerType(question: string, evidenceText: string): AnswerType | null {
   for (const rule of ANSWER_TYPE_RULES) {
     if (rule.question.test(question) && !rule.evidence.test(evidenceText)) return rule.type;
   }
+  if (missingOfficeLocation(question, evidenceText)) return 'office_location';
   return null;
 }
 
@@ -164,9 +202,31 @@ const NUMBER_RE = /\d+(?:[.,]\d+)*/g;
 
 const digitsOnly = (s: string) => s.replace(/\D/g, '');
 
+/** Two or more consecutive capitalised Latin-script words, e.g. "John Smith", "PT Maju Jaya", "Acme Holdings". */
+const NAME_RUN_RE = /(?<![\p{L}\d])[A-ZÀ-ÖØ-Þ][\p{Script=Latin}'’-]*(?:\s+(?:(?:&|of|and|de|van|bin|binti)\s+)?[A-ZÀ-ÖØ-Þ][\p{Script=Latin}'’-]*)+/gu;
+const NAME_CONNECTORS = new Set(['&', 'of', 'and', 'de', 'van', 'bin', 'binti']);
+/**
+ * Capitalised words that are not names: sentence starters, pronouns and
+ * common words in English and Indonesian, plus terms the assistant may use
+ * without a source (its own name, languages, weekdays, months).
+ */
+const COMMON_CAPITALISED = new Set(
+  (
+    'a an the and or but if so yes no not of in on at to for from by with as is are was were be been this that these those it its ' +
+    'we our us you your they their i my he she his her who what when where which why how there here also however certainly sure absolutely ' +
+    'great thank thanks please hello hi welcome of course indeed additionally furthermore moreover overall currently generally in general ' +
+    'for example such each every all some any many most more other another both either neither one two three first second finally next then ' +
+    'ai assistant inpartner inpartner’s inpartner\'s english indonesian bahasa indonesia korean 한국어 ' +
+    'monday tuesday wednesday thursday friday saturday sunday january february march april may june july august september october november december ' +
+    'tentu ya tidak untuk dengan dan atau di ke dari pada yang ini itu kami kita anda mereka saya kamu silakan terima kasih selain selamat ' +
+    'layanan tim apakah bagaimana apa siapa kapan mengapa dimana secara umum misalnya namun juga'
+  ).split(/\s+/),
+);
+
 /**
  * Lists concrete claims in an answer that the evidence does not contain:
- * URLs, e-mail addresses, phone numbers and any other number. Returns the
+ * URLs, e-mail addresses, phone numbers, any other number, and capitalised
+ * names (people, companies, places) absent from the evidence. Returns the
  * claim kinds only (never the text) so callers can log them safely.
  */
 export function unsupportedClaims(answer: string, evidenceText: string): string[] {
@@ -190,6 +250,21 @@ export function unsupportedClaims(answer: string, evidenceText: string): string[
     if (digits.length >= 8) {
       if (!evidenceDigits.includes(digits)) problems.push('phone');
       rest = rest.replace(phone, ' ');
+    }
+  }
+
+  // Names of people, companies or places that the evidence never mentions ("Our client PT Maju Jaya", "founded by
+  // John Smith"). A heuristic: every word of a capitalised run must occur in the evidence or be a common word.
+  const evidenceWords = new Set(evidenceLower.match(/[\p{L}'’-]+/gu) ?? []);
+  for (const run of rest.match(NAME_RUN_RE) ?? []) {
+    const words = run.split(/\s+/).filter((w) => !NAME_CONNECTORS.has(w.toLowerCase()));
+    const unknown = words.filter((w) => {
+      const lower = w.toLowerCase().replace(/['’]s$/, '');
+      return !evidenceWords.has(lower) && !COMMON_CAPITALISED.has(lower);
+    });
+    if (unknown.length > 0) {
+      problems.push('name');
+      break;
     }
   }
 

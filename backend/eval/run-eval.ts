@@ -14,12 +14,20 @@
  *   --dataset=PATH    Question set (default eval/dataset.json; eval/holdout.json
  *                     is the held-out set).
  *
+ * Offline thresholds (exit 1 when missed): --min-answerable=0.9 (share of
+ * answerable items reaching the model with an expected page) and
+ * --min-stopped=0 (share of unanswerable items stopped before the model).
+ *
+ * Live safeguards: --max-model-calls=N (default 150) stops the run before it
+ * exceeds N provider calls; set EVAL_COST_PER_1M_INPUT / EVAL_COST_PER_1M_OUTPUT
+ * (your contract's USD price per million tokens) to get a cost estimate.
+ *
  * Usage: npm run eval:retrieval [-- --dataset=eval/holdout.json] | npm run eval:live
  */
 import { readFile, writeFile } from 'node:fs/promises';
 import { loadConfig } from '../src/config/env.js';
 import { createLogger } from '../src/lib/logger.js';
-import { ChatService, type ChatOutcome, type Language } from '../src/services/chat.js';
+import { BudgetExceededError, ChatService, type ChatHistoryTurn, type ChatOutcome, type Language } from '../src/services/chat.js';
 import { KnowledgeBaseStore, readKnowledgeBaseFile } from '../src/services/knowledge-base.js';
 import { GeminiClient, LlmError, type LlmRequest } from '../src/services/llm.js';
 import { Bm25Retriever } from '../src/services/retrieval.js';
@@ -32,6 +40,8 @@ interface Item {
   expect: 'answer' | 'fallback' | 'either';
   expected_docs: string[];
   forbidden?: string[];
+  /** Earlier turns for follow-up questions, sent like the widget sends them. */
+  history?: ChatHistoryTurn[];
 }
 
 interface Dataset {
@@ -40,6 +50,13 @@ interface Dataset {
 }
 
 const pct = (n: number, d: number) => (d === 0 ? 'n/a' : `${((100 * n) / d).toFixed(1)}%`);
+
+function numArg(name: string, fallback: number): number {
+  const raw = process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
+  const value = raw === undefined ? fallback : Number(raw);
+  if (!Number.isFinite(value)) throw new Error(`--${name} must be a number`);
+  return value;
+}
 
 async function loadStore(kbPath: string, hosts: string[]): Promise<KnowledgeBaseStore> {
   const store = new KnowledgeBaseStore(hosts);
@@ -80,10 +97,13 @@ async function retrievalEval(dataset: Dataset): Promise<boolean> {
   const eitherRows: string[] = [];
 
   for (const item of dataset.items) {
-    const docs = [...new Set(retriever.search(item.question, topK, minScore).map((r) => r.chunk.docId))];
+    let hits = retriever.search(item.question, topK, minScore);
+    const lastUser = [...(item.history ?? [])].reverse().find((h) => h.role === 'user');
+    if (hits.length === 0 && lastUser) hits = retriever.search(`${lastUser.text} ${item.question}`, topK, minScore);
+    const docs = [...new Set(hits.map((r) => r.chunk.docId))];
     const expected = item.expected_docs.map((k) => dataset.doc_ids[k]);
     probe.last = null;
-    const result = await chat.answer(item.question, item.language);
+    const result = await chat.answer(item.question, item.language, item.history);
     const reached = probe.last !== null;
     const why = `${result.outcome}${result.reason ? `:${result.reason}` : ''}`;
 
@@ -108,19 +128,30 @@ async function retrievalEval(dataset: Dataset): Promise<boolean> {
   console.log(`Offline evaluation (topK=${topK}, minScore=${minScore}, ${dataset.items.length} questions)`);
   console.log(`  Answerable: expected page retrieved              ${retrievalHits}/${answerTotal} (${pct(retrievalHits, answerTotal)})`);
   console.log(`  Answerable: reaches the model with expected page ${reachedWithEvidence}/${answerTotal} (${pct(reachedWithEvidence, answerTotal)})`);
+  console.log(`  Answerable: false refusals (gate or retrieval)   ${falseRefusals.length}`);
   console.log(`  Unanswerable: stopped before the model           ${fallbackStopped}/${fallbackTotal} (${pct(fallbackStopped, fallbackTotal)})`);
   console.log(`    by: ${Object.entries(stoppedBy).sort().map(([k, v]) => `${k}=${v}`).join(', ') || 'none'}`);
   if (retrievalMisses.length) console.log(`  Retrieval misses:\n    ${retrievalMisses.join('\n    ')}`);
   if (falseRefusals.length) console.log(`  Answerable questions that do not reach the model with an expected page:\n    ${falseRefusals.join('\n    ')}`);
   if (reachesModel.length) console.log(`  Unanswerable questions that reach the model (it must decline; answers are claim-checked):\n    ${reachesModel.join('\n    ')}`);
   if (eitherRows.length) console.log(`  Ambiguous ("either") questions:\n    ${eitherRows.join('\n    ')}`);
-  return answerTotal > 0 && reachedWithEvidence / answerTotal >= 0.9;
+  const minAnswerable = numArg('min-answerable', 0.9);
+  const minStopped = numArg('min-stopped', 0);
+  const answerableOk = answerTotal > 0 && reachedWithEvidence / answerTotal >= minAnswerable;
+  const stoppedOk = fallbackTotal === 0 || fallbackStopped / fallbackTotal >= minStopped;
+  if (!answerableOk) console.log(`FAIL: answerable reach rate below --min-answerable=${minAnswerable}`);
+  if (!stoppedOk) console.log(`FAIL: unanswerable stop rate below --min-stopped=${minStopped}`);
+  return answerableOk && stoppedOk;
 }
 
 async function liveEval(dataset: Dataset): Promise<boolean> {
   const config = loadConfig();
   const store = await loadStore(config.kbPath, config.allowedSourceHosts);
   const logger = createLogger('warn');
+  const maxModelCalls = numArg('max-model-calls', 150);
+  let modelCalls = 0;
+  let promptTokens = 0;
+  let outputTokens = 0;
   const chat = new ChatService({
     store,
     retriever: new Bm25Retriever(store.chunks()),
@@ -130,11 +161,17 @@ async function liveEval(dataset: Dataset): Promise<boolean> {
       baseUrl: config.geminiApiBaseUrl,
       timeoutMs: config.geminiTimeoutMs,
       maxOutputTokens: config.geminiMaxOutputTokens,
+      onUsage: (u) => {
+        promptTokens += u.promptTokens;
+        outputTokens += u.outputTokens;
+      },
     }),
     logger,
     topK: config.retrievalTopK,
     minScore: config.retrievalMinScore,
     secrets: [config.geminiApiKey, config.chatSharedSecret, config.indexApiToken],
+    // Hard cap on spend: each answer that reaches the model consumes one unit (the client may retry once).
+    budget: { consume: () => (modelCalls < maxModelCalls ? (modelCalls++, { allowed: true, retryAfterSeconds: 0 }) : { allowed: false, retryAfterSeconds: 0 }) },
   });
   const kbUrls = new Set(store.all().map((d) => d.url));
 
@@ -144,11 +181,13 @@ async function liveEval(dataset: Dataset): Promise<boolean> {
   let citing = 0, validCitations = 0, forbiddenHits = 0;
   const latencies: number[] = [];
   const outcomes: Partial<Record<ChatOutcome | 'error', number>> = {};
+  const errorKinds: Record<string, number> = {};
+  let stoppedByBudget = false;
 
   for (const item of dataset.items) {
     const started = Date.now();
     try {
-      const result = await chat.answer(item.question, item.language);
+      const result = await chat.answer(item.question, item.language, item.history);
       outcomes[result.outcome] = (outcomes[result.outcome] ?? 0) + 1;
       latencies.push(Date.now() - started);
       ok += 1;
@@ -174,22 +213,55 @@ async function liveEval(dataset: Dataset): Promise<boolean> {
         if (pass) fallbackPass += 1;
         else if (forbidden.length === 0) fallbackNeedsReview += 1;
       }
-      rows.push({ ...item, result, outcome: result.outcome, forbidden_matched: forbidden, auto_pass: pass, latency_ms: Date.now() - started });
+      rows.push({
+        ...item,
+        result,
+        outcome: result.outcome,
+        forbidden_matched: forbidden,
+        auto_pass: pass,
+        latency_ms: Date.now() - started,
+        // Filled in by the reviewer: correct | unsupported_claim | wrong_refusal | tone_language (see docs/evaluation.md).
+        human_review: { verdict: null, reviewer: null, notes: '' },
+      });
     } catch (err) {
+      if (err instanceof BudgetExceededError) {
+        stoppedByBudget = true;
+        console.log(`Stopped: --max-model-calls=${maxModelCalls} reached before ${item.id}; remaining items were not run.`);
+        break;
+      }
       failedRequests += 1;
       outcomes.error = (outcomes.error ?? 0) + 1;
-      rows.push({ ...item, error: err instanceof LlmError ? err.kind : 'error', latency_ms: Date.now() - started });
+      const kind = err instanceof LlmError ? err.kind : 'error';
+      errorKinds[kind] = (errorKinds[kind] ?? 0) + 1;
+      rows.push({ ...item, error: kind, latency_ms: Date.now() - started });
     }
     await new Promise((r) => setTimeout(r, 300));
   }
 
   latencies.sort((a, b) => a - b);
   const p95 = latencies[Math.max(0, Math.ceil(latencies.length * 0.95) - 1)] ?? 0;
+  const p50 = latencies[Math.max(0, Math.ceil(latencies.length * 0.5) - 1)] ?? 0;
+  const inRate = Number(process.env.EVAL_COST_PER_1M_INPUT);
+  const outRate = Number(process.env.EVAL_COST_PER_1M_OUTPUT);
+  const cost = Number.isFinite(inRate) && Number.isFinite(outRate) && process.env.EVAL_COST_PER_1M_INPUT && process.env.EVAL_COST_PER_1M_OUTPUT
+    ? `USD ${((promptTokens * inRate + outputTokens * outRate) / 1_000_000).toFixed(4)} (rates from env)`
+    : 'not computed (set EVAL_COST_PER_1M_INPUT and EVAL_COST_PER_1M_OUTPUT)';
+  const run = rows.length;
   const summary = {
+    status: 'measured',
+    run_at: new Date().toISOString(),
+    stopped_by_budget: stoppedByBudget,
+    questions_run: `${run}/${dataset.items.length}`,
+    model_calls: modelCalls,
+    tokens: { prompt: promptTokens, output: outputTokens },
+    estimated_cost: cost,
+    provider_errors: errorKinds,
+    unsupported_claims_caught: outcomes.unsupported_claims ?? 0,
+    latency_p50_ms: p50,
     model: config.geminiModel,
     questions: dataset.items.length,
     successful_requests: `${ok}/${dataset.items.length} (${pct(ok, dataset.items.length)})`,
-    request_failure_rate: pct(failedRequests, dataset.items.length),
+    request_failure_rate: pct(failedRequests, run),
     answerable_retrieval_hit: `${answerRetrieved}/${answerTotal} (${pct(answerRetrieved, answerTotal)})`,
     answerable_auto_pass: `${answerPass}/${answerTotal} (${pct(answerPass, answerTotal)})`,
     unanswerable_refused: `${fallbackPass}/${fallbackTotal} (${pct(fallbackPass, fallbackTotal)})`,
@@ -204,7 +276,7 @@ async function liveEval(dataset: Dataset): Promise<boolean> {
   await writeFile(out, JSON.stringify({ summary, rows }, null, 2));
   console.log(JSON.stringify(summary, null, 2));
   console.log(`Per-question results (review manually for unsupported claims): ${out}`);
-  return forbiddenHits === 0 && validCitations === citing;
+  return !stoppedByBudget && forbiddenHits === 0 && validCitations === citing;
 }
 
 async function main(): Promise<void> {

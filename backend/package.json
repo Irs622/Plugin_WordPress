@@ -19,7 +19,8 @@
     "eval:live": "npm run build && node dist/eval/run-eval.js --mode=live",
     "secret": "node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\"",
     "kb:validate": "npm run build && node dist/scripts/validate-kb.js",
-    "mock:gemini": "node dist/scripts/mock-gemini.js 8790"
+    "mock:gemini": "node dist/scripts/mock-gemini.js 8790",
+    "kb:verify-sources": "npm run build && node dist/scripts/verify-sources.js"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
