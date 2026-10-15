@@ -28,9 +28,14 @@ abstract class TestCase extends \PHPUnit\Framework\TestCase {
 			$status = is_array( $args ) && isset( $args['response'] ) ? (int) $args['response'] : 500;
 			throw new WpDieException( is_string( $message ) ? $message : 'wp_die', $status );
 		} );
+		// No test may reach a real network service: requests not answered by a test's own
+		// pre_http_request filter fail as "unreachable", and no e-mail leaves the machine.
+		$this->add_filter( 'pre_http_request', fn( $preempt ) => false !== $preempt ? $preempt : new \WP_Error( 'wkc_test_no_http', 'Real HTTP is disabled in tests.' ), 1000 );
+		$this->add_filter( 'pre_wp_mail', fn( $short ) => null !== $short ? $short : true, 1000 );
 	}
 
 	protected function tearDown(): void {
+		\WP_Knowledge_Chat\Content_Sync::discard_queue();
 		foreach ( $this->filters as [ $hook, $callback, $priority ] ) {
 			remove_filter( $hook, $callback, $priority );
 		}

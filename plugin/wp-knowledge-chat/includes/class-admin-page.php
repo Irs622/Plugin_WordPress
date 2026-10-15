@@ -22,12 +22,14 @@ final class Admin_Page {
 	public const HEALTH_ACTION = 'wkc_test_connection';
 	public const SYNC_ACTION   = 'wkc_sync_kb';
 	public const SYNC_NONCE    = 'wkc_sync_nonce';
+	public const LEADS_ACTION  = 'wkc_leads_action';
 
 	public function hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
 		add_action( 'admin_init', array( $this, 'add_fields' ) );
 		add_action( 'admin_post_' . self::HEALTH_ACTION, array( $this, 'handle_test_connection' ) );
 		add_action( 'admin_post_' . self::SYNC_ACTION, array( $this, 'handle_sync' ) );
+		add_action( 'admin_post_' . self::LEADS_ACTION, array( $this, 'handle_leads_action' ) );
 	}
 
 	public function add_menu(): void {
@@ -289,6 +291,45 @@ final class Admin_Page {
 				</div>
 			<?php endif; ?>
 
+			<?php
+			$pending = Content_Sync::pending();
+			if ( ! empty( $pending ) ) :
+				?>
+				<div class="notice notice-error">
+					<p>
+						<strong><?php esc_html_e( 'Automatic updates failed:', 'wp-knowledge-chat' ); ?></strong>
+						<?php esc_html_e( 'the AI backend still has an outdated copy of these pages (an unpublished page may still be answered from). They are retried every few minutes.', 'wp-knowledge-chat' ); ?>
+					</p>
+					<ul style="list-style:disc;margin-left:20px;">
+						<?php foreach ( $pending as $pending_id => $info ) : ?>
+							<li>
+								<?php
+								echo esc_html(
+									sprintf(
+										/* translators: 1: page title or ID, 2: error code, 3: attempts, 4: date. */
+										__( '%1$s — %2$s, %3$d attempt(s) since %4$s UTC', 'wp-knowledge-chat' ),
+										get_the_title( (int) $pending_id ) ?: '#' . (int) $pending_id,
+										(string) ( $info['error'] ?? '' ),
+										(int) ( $info['attempts'] ?? 0 ),
+										(string) ( $info['since'] ?? '' )
+									)
+								);
+								?>
+							</li>
+						<?php endforeach; ?>
+					</ul>
+					<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" style="margin-bottom:8px;">
+						<input type="hidden" name="action" value="<?php echo esc_attr( self::SYNC_ACTION ); ?>" />
+						<?php wp_nonce_field( self::SYNC_ACTION, self::SYNC_NONCE ); ?>
+						<button type="submit" name="sync_mode" value="retry" class="button"><?php esc_html_e( 'Retry now', 'wp-knowledge-chat' ); ?></button>
+					</form>
+				</div>
+			<?php endif; ?>
+
+			<p class="description">
+				<?php esc_html_e( 'Only pages you sync here enter the knowledge base. After that, edits are sent automatically; unpublishing, trashing, password-protecting or deleting a page removes it. New pages are never added automatically, and password-protected pages are never indexed.', 'wp-knowledge-chat' ); ?>
+			</p>
+
 			<?php if ( ! $index_configured ) : ?>
 				<div class="notice notice-warning">
 					<p>
@@ -358,7 +399,9 @@ final class Admin_Page {
 										</select>
 									</td>
 									<td>
-										<?php if ( $page['eligible'] ) : ?>
+										<?php if ( ! empty( $page['protected'] ) ) : ?>
+											<span style="color:#b32d2e;"><?php esc_html_e( 'Password protected (never indexed)', 'wp-knowledge-chat' ); ?></span>
+										<?php elseif ( $page['eligible'] ) : ?>
 											<span style="color:#007017;">
 												<?php
 												printf(
@@ -382,6 +425,9 @@ final class Admin_Page {
 									</td>
 									<td>
 										<?php echo esc_html( $page['modified'] ); ?>
+										<?php if ( ! empty( $page['synced'] ) ) : ?>
+											<br /><span class="description"><?php esc_html_e( 'In knowledge base', 'wp-knowledge-chat' ); ?></span>
+										<?php endif; ?>
 									</td>
 								</tr>
 							<?php endforeach; ?>
@@ -436,6 +482,23 @@ final class Admin_Page {
 		$sync_mode   = isset( $_POST['sync_mode'] ) ? sanitize_key( wp_unslash( $_POST['sync_mode'] ) ) : 'selected';
 		$replace_all = ! empty( $_POST['replace_all'] );
 
+		if ( 'retry' === $sync_mode ) {
+			$left = Content_Sync::retry_pending();
+			set_transient(
+				'wkc_sync_result_' . get_current_user_id(),
+				array(
+					'success' => 0 === $left,
+					'message' => 0 === $left
+						? __( 'All pending knowledge-base updates were applied.', 'wp-knowledge-chat' )
+						/* translators: %d: number of pages. */
+						: sprintf( __( '%d page update(s) still failing. Check the backend and try again.', 'wp-knowledge-chat' ), $left ),
+				),
+				MINUTE_IN_SECONDS
+			);
+			wp_safe_redirect( admin_url( 'admin.php?page=' . self::SYNC_SLUG ) );
+			exit;
+		}
+
 		$category_map = array();
 		if ( isset( $_POST['categories'] ) && is_array( $_POST['categories'] ) ) {
 			// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- elements sanitized in loop.
@@ -476,8 +539,15 @@ final class Admin_Page {
 			wp_die( esc_html__( 'You do not have permission to access this page.', 'wp-knowledge-chat' ), 403 );
 		}
 
+		Analytics::maybe_migrate_legacy_leads();
+		Analytics::purge_expired_leads();
+		$notice = get_transient( 'wkc_leads_notice_' . get_current_user_id() );
+		if ( false !== $notice ) {
+			delete_transient( 'wkc_leads_notice_' . get_current_user_id() );
+		}
 		$metrics      = Analytics::get_metrics();
 		$leads        = Analytics::get_leads();
+		$lead_count   = Analytics::count_leads();
 		$total        = $metrics['total_queries'];
 		$grounded     = $metrics['grounded_queries'];
 		$fallback     = $metrics['fallback_queries'];
@@ -487,8 +557,11 @@ final class Admin_Page {
 		<div class="wrap">
 			<h1><?php esc_html_e( 'Analytics & Consultation Leads', 'wp-knowledge-chat' ); ?></h1>
 			<p class="description">
-				<?php esc_html_e( 'Monitor chatbot engagement, question trends, and visitor consultation requests. Zero personal data or visitor IPs are collected for queries.', 'wp-knowledge-chat' ); ?>
+				<?php esc_html_e( 'Monitor chatbot engagement, question trends, and visitor consultation requests. Visitor IP addresses are never stored. Question snippets have e-mail addresses, phone numbers and links removed, but may still contain personal details a visitor typed. Leads contain personal data: keep them only as long as needed.', 'wp-knowledge-chat' ); ?>
 			</p>
+			<?php if ( is_string( $notice ) && '' !== $notice ) : ?>
+				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div>
+			<?php endif; ?>
 
 			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0;">
 				<div class="card" style="margin:0;padding:16px;">
@@ -508,35 +581,52 @@ final class Admin_Page {
 				</div>
 				<div class="card" style="margin:0;padding:16px;">
 					<h3 style="margin-top:0;color:#2271b1;"><?php esc_html_e( 'Captured Leads', 'wp-knowledge-chat' ); ?></h3>
-					<div style="font-size:28px;font-weight:700;color:#2271b1;"><?php echo count( $leads ); ?></div>
+					<div style="font-size:28px;font-weight:700;color:#2271b1;"><?php echo (int) $lead_count; ?></div>
 					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Prospective clients requesting consultation', 'wp-knowledge-chat' ); ?></p>
 				</div>
 			</div>
 
 			<h2><?php esc_html_e( 'Captured Consultation Leads', 'wp-knowledge-chat' ); ?></h2>
+			<?php if ( $lead_count > count( $leads ) ) : ?>
+				<p class="description">
+					<?php
+					/* translators: 1: leads shown, 2: total leads. */
+					echo esc_html( sprintf( __( 'Showing the newest %1$d of %2$d leads. Export CSV includes all of them.', 'wp-knowledge-chat' ), count( $leads ), $lead_count ) );
+					?>
+				</p>
+			<?php endif; ?>
+			<div style="display:flex;gap:8px;margin:8px 0;">
+				<?php $this->leads_button( 'export', __( 'Export CSV', 'wp-knowledge-chat' ), 'button' ); ?>
+				<?php $this->leads_button( 'delete_all', __( 'Delete all leads', 'wp-knowledge-chat' ), 'button button-link-delete', __( 'Permanently delete all leads? This cannot be undone.', 'wp-knowledge-chat' ) ); ?>
+				<?php $this->leads_button( 'reset_metrics', __( 'Reset metrics', 'wp-knowledge-chat' ), 'button', __( 'Reset all conversation counts and recent questions?', 'wp-knowledge-chat' ) ); ?>
+			</div>
 			<table class="wp-list-table widefat fixed striped" style="margin-bottom:30px;">
 				<thead>
 					<tr>
-						<th scope="col" style="width:160px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:160px;"><?php esc_html_e( 'Name', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:200px;"><?php esc_html_e( 'Email', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:180px;"><?php esc_html_e( 'Company', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:150px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:150px;"><?php esc_html_e( 'Name', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:190px;"><?php esc_html_e( 'Email', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:150px;"><?php esc_html_e( 'Company', 'wp-knowledge-chat' ); ?></th>
 						<th scope="col"><?php esc_html_e( 'Inquiry Message', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:110px;"><?php esc_html_e( 'Notification', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" style="width:90px;"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'wp-knowledge-chat' ); ?></span></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ( empty( $leads ) ) : ?>
 						<tr>
-							<td colspan="5"><?php esc_html_e( 'No leads captured yet. Prospective clients who request consultation via the chat widget will appear here.', 'wp-knowledge-chat' ); ?></td>
+							<td colspan="7"><?php esc_html_e( 'No leads captured yet. Prospective clients who request consultation via the chat widget will appear here.', 'wp-knowledge-chat' ); ?></td>
 						</tr>
 					<?php else : ?>
 						<?php foreach ( $leads as $lead ) : ?>
 							<tr>
 								<td><?php echo esc_html( $lead['created_at'] ); ?></td>
 								<td><strong><?php echo esc_html( $lead['name'] ); ?></strong></td>
-								<td><a href="mailto:<?php echo esc_attr( $lead['email'] ); ?>"><?php echo esc_html( $lead['email'] ); ?></a></td>
+								<td><a href="<?php echo esc_url( 'mailto:' . $lead['email'] ); ?>"><?php echo esc_html( $lead['email'] ); ?></a></td>
 								<td><?php echo esc_html( $lead['company'] ?: '—' ); ?></td>
 								<td><?php echo esc_html( $lead['message'] ?: '—' ); ?></td>
+								<td><?php echo esc_html( self::mail_status_label( $lead['mail_status'] ) ); ?></td>
+								<td><?php $this->leads_button( 'delete', __( 'Delete', 'wp-knowledge-chat' ), 'button-link button-link-delete', __( 'Permanently delete this lead?', 'wp-knowledge-chat' ), (int) $lead['id'] ); ?></td>
 							</tr>
 						<?php endforeach; ?>
 					<?php endif; ?>
@@ -578,5 +668,101 @@ final class Admin_Page {
 			</table>
 		</div>
 		<?php
+	}
+
+	private static function mail_status_label( string $status ): string {
+		$labels = array(
+			'sent'     => __( 'Sent', 'wp-knowledge-chat' ),
+			'failed'   => __( 'Failed', 'wp-knowledge-chat' ),
+			'pending'  => __( 'Pending', 'wp-knowledge-chat' ),
+			'migrated' => __( 'Before 0.2.1', 'wp-knowledge-chat' ),
+		);
+		return $labels[ $status ] ?? '—';
+	}
+
+	/**
+	 * One-button form posting to admin-post.php with a nonce bound to the operation (and lead).
+	 */
+	private function leads_button( string $operation, string $label, string $class, string $confirm = '', int $lead_id = 0 ): void {
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;"<?php echo '' !== $confirm ? ' onsubmit="return window.confirm(' . esc_attr( wp_json_encode( $confirm ) ) . ');"' : ''; ?>>
+			<input type="hidden" name="action" value="<?php echo esc_attr( self::LEADS_ACTION ); ?>" />
+			<input type="hidden" name="operation" value="<?php echo esc_attr( $operation ); ?>" />
+			<?php if ( $lead_id > 0 ) : ?>
+				<input type="hidden" name="lead_id" value="<?php echo esc_attr( (string) $lead_id ); ?>" />
+			<?php endif; ?>
+			<?php wp_nonce_field( self::LEADS_ACTION . '_' . $operation . '_' . $lead_id ); ?>
+			<button type="submit" class="<?php echo esc_attr( $class ); ?>"><?php echo esc_html( $label ); ?></button>
+		</form>
+		<?php
+	}
+
+	public function handle_leads_action(): void {
+		if ( ! current_user_can( self::CAPABILITY ) ) {
+			wp_die( esc_html__( 'You do not have permission to do this.', 'wp-knowledge-chat' ), 403 );
+		}
+		$operation = isset( $_POST['operation'] ) ? sanitize_key( wp_unslash( $_POST['operation'] ) ) : '';
+		$lead_id   = isset( $_POST['lead_id'] ) ? absint( $_POST['lead_id'] ) : 0;
+		check_admin_referer( self::LEADS_ACTION . '_' . $operation . '_' . $lead_id );
+
+		$notice = '';
+		switch ( $operation ) {
+			case 'delete':
+				$notice = Analytics::delete_lead( $lead_id ) ? __( 'Lead deleted.', 'wp-knowledge-chat' ) : __( 'Lead not found.', 'wp-knowledge-chat' );
+				break;
+			case 'delete_all':
+				/* translators: %d: number of leads. */
+				$notice = sprintf( __( '%d lead(s) deleted.', 'wp-knowledge-chat' ), Analytics::delete_leads() );
+				break;
+			case 'reset_metrics':
+				Analytics::reset_metrics();
+				$notice = __( 'Metrics reset.', 'wp-knowledge-chat' );
+				break;
+			case 'export':
+				$this->send_leads_csv();
+				return;
+			default:
+				wp_die( esc_html__( 'Unknown action.', 'wp-knowledge-chat' ), 400 );
+		}
+		set_transient( 'wkc_leads_notice_' . get_current_user_id(), $notice, MINUTE_IN_SECONDS );
+		wp_safe_redirect( admin_url( 'admin.php?page=' . self::LEADS_SLUG ) );
+		exit;
+	}
+
+	/**
+	 * Neutralises spreadsheet formulas (CSV injection) in visitor-supplied cells.
+	 */
+	public static function csv_cell( string $value ): string {
+		return preg_match( '/^[=+\-@\t\r]/', $value ) ? "'" . $value : $value;
+	}
+
+	/**
+	 * @return string CSV of every lead (header row first).
+	 */
+	public static function leads_csv(): string {
+		$handle = fopen( 'php://temp', 'r+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		fputcsv( $handle, array( 'created_at_utc', 'name', 'email', 'company', 'message', 'language', 'notification' ), ',', '"', '' );
+		foreach ( Analytics::get_leads( 100000 ) as $lead ) {
+			fputcsv(
+				$handle,
+				array_map( array( self::class, 'csv_cell' ), array( $lead['created_at'], $lead['name'], $lead['email'], $lead['company'], $lead['message'], $lead['language'], $lead['mail_status'] ) ),
+				',',
+				'"',
+				''
+			);
+		}
+		rewind( $handle );
+		$csv = (string) stream_get_contents( $handle );
+		fclose( $handle ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		return $csv;
+	}
+
+	private function send_leads_csv(): void {
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="wkc-leads-' . gmdate( 'Ymd-His' ) . '.csv"' );
+		header( 'X-Content-Type-Options: nosniff' );
+		echo self::leads_csv(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSV download, cells neutralised by csv_cell().
+		exit;
 	}
 }

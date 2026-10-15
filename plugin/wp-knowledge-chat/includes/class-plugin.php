@@ -25,11 +25,18 @@ final class Plugin {
 	public function boot(): void {
 		add_action( 'init', array( self::class, 'load_textdomain' ) );
 		add_action( 'init', array( Settings::class, 'register' ) );
+		add_action( 'init', array( Analytics::class, 'register_post_type' ) );
+		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
+		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
 		// While the stored value equals the registered default, update_option() takes the add_option() path.
 		add_action( 'add_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
 		add_action( 'update_option_' . Settings::OPTION, array( self::class, 'purge_page_cache' ) );
 		add_action( 'rest_api_init', array( new Rest_Controller(), 'register_routes' ) );
 		add_action( 'transition_post_status', array( Content_Sync::class, 'on_post_status_transition' ), 10, 3 );
+		add_action( 'wp_after_insert_post', array( Content_Sync::class, 'on_after_insert_post' ), 10, 1 );
+		add_action( 'elementor/document/after_save', array( Content_Sync::class, 'on_elementor_save' ), 10, 1 );
+		add_action( 'before_delete_post', array( Content_Sync::class, 'on_before_delete_post' ), 10, 1 );
+		add_action( Content_Sync::RETRY_HOOK, array( Content_Sync::class, 'retry_pending' ) );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_filter( 'plugin_action_links_' . plugin_basename( WP_KNOWLEDGE_CHAT_FILE ), array( $this, 'action_links' ) );
 
@@ -48,6 +55,8 @@ final class Plugin {
 
 	public static function activate(): void {
 		Settings::install();
+		Analytics::register_post_type();
+		Analytics::maybe_migrate_legacy_leads();
 	}
 
 	/**
@@ -55,6 +64,7 @@ final class Plugin {
 	 */
 	public static function deactivate(): void {
 		wp_cache_delete( Settings::OPTION, 'options' );
+		wp_clear_scheduled_hook( Content_Sync::RETRY_HOOK );
 	}
 
 	/**
