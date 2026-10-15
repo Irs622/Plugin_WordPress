@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
@@ -57,7 +57,7 @@ jobs:
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           extensions: mbstring, intl, sqlite3, curl, zip, pdo_sqlite
           tools: composer
           coverage: none
@@ -71,7 +71,7 @@ jobs:
 
       - name: Install Test Tooling
         working-directory: plugin/wp-knowledge-chat/tests
-        run: composer install --prefer-dist --no-progress
+        run: composer install --prefer-dist --no-progress --ignore-platform-req=php+
 
       - name: Check WordPress Coding Standards (PHPCS)
         working-directory: plugin/wp-knowledge-chat/tests
@@ -97,7 +97,7 @@ jobs:
       - name: Setup PHP for Packaging Verification
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
 
       - name: Build Plugin Distribution ZIP
         run: ./scripts/package-plugin.sh
