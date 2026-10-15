@@ -225,6 +225,15 @@ try {
 		assert.deepEqual(violations, []);
 	});
 
+	await check('consultation form: labelled fields, focus, no axe violations (not submitted)', async () => {
+		await evaluate("[...document.querySelectorAll('.wkc-lead-btn')].at(-1).click(); true");
+		assert.ok(await evaluate("document.activeElement === document.querySelector('.wkc-lead-card [name=\\'name\\']')"), 'focus moves to the name field');
+		const violations = await evaluate(`axe.run('.wkc-lead-card', { runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] } }).then(r => r.violations.map(v => v.id + ': ' + v.help + ' (' + v.nodes.length + ')'))`);
+		assert.deepEqual(violations, []);
+		await evaluate("document.querySelector('.wkc-lead-cancel').click(); true");
+		assert.ok(await evaluate("!document.querySelector('.wkc-lead-card')"));
+	});
+
 	await check('Escape closes the panel and returns focus to the launcher', async () => {
 		await evaluate("document.getElementById('wkc-input').focus(); true");
 		await key('Escape', 'Escape', 27);

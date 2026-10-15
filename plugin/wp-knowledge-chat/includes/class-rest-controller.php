@@ -26,6 +26,10 @@ final class Rest_Controller {
 	public const MAX_ANSWER_CHARS  = 2000;
 	public const MAX_SOURCES       = 5;
 
+	public const LEAD_LIMIT_PER_VISITOR = 3;
+	public const LEAD_WINDOW            = 10 * MINUTE_IN_SECONDS;
+	public const LEAD_LIMIT_PER_HOUR    = 30;
+
 	public function register_routes(): void {
 		register_rest_route(
 			self::NAMESPACE,
@@ -59,21 +63,35 @@ final class Rest_Controller {
 				'callback'            => array( $this, 'handle_lead' ),
 				'permission_callback' => '__return_true',
 				'args'                => array(
-					'name'    => array(
-						'type'     => 'string',
-						'required' => true,
+					'name'     => array(
+						'type'      => 'string',
+						'required'  => true,
+						'maxLength' => Analytics::FIELD_LIMITS['name'],
 					),
-					'email'   => array(
-						'type'     => 'string',
-						'required' => true,
+					'email'    => array(
+						'type'      => 'string',
+						'required'  => true,
+						'maxLength' => Analytics::FIELD_LIMITS['email'],
 					),
-					'company' => array(
-						'type'     => 'string',
-						'required' => false,
+					'company'  => array(
+						'type'      => 'string',
+						'required'  => false,
+						'maxLength' => Analytics::FIELD_LIMITS['company'],
 					),
-					'message' => array(
-						'type'     => 'string',
-						'required' => false,
+					'message'  => array(
+						'type'      => 'string',
+						'required'  => false,
+						'maxLength' => Analytics::FIELD_LIMITS['message'],
+					),
+					'language' => array(
+						'type' => 'string',
+						'enum' => Settings::LANGUAGES,
+					),
+					// Honeypot: hidden in the widget, so only bots fill it in.
+					'website'  => array(
+						'type'      => 'string',
+						'required'  => false,
+						'maxLength' => 200,
 					),
 				),
 			)
@@ -171,11 +189,21 @@ final class Rest_Controller {
 	/**
 	 * Handles voluntary lead submissions from visitors requesting consultation.
 	 *
+	 * Public by design (anonymous visitors), so abuse is bounded here: origin
+	 * check, field length limits, a honeypot field, a per-visitor limit of
+	 * LEAD_LIMIT_PER_VISITOR per LEAD_WINDOW, a site-wide limit per hour (it
+	 * caps notification e-mails) and suppression of identical resubmissions.
+	 * Responses never echo the submitted data.
+	 *
 	 * @return \WP_REST_Response|\WP_Error
 	 */
 	public function handle_lead( \WP_REST_Request $request ) {
 		$settings = Settings::get();
 		$language = $settings['language'];
+		$requested_language = $request->get_param( 'language' );
+		if ( is_string( $requested_language ) && in_array( $requested_language, Settings::LANGUAGES, true ) ) {
+			$language = $requested_language;
+		}
 
 		if ( ! $settings['enabled'] ) {
 			return $this->error( 'wkc_unavailable', 'unavailable', $language, 503 );
@@ -185,42 +213,89 @@ final class Rest_Controller {
 			return $this->error( 'wkc_forbidden_origin', 'forbidden', $language, 403 );
 		}
 
+		$honeypot = $request->get_param( 'website' );
+		if ( is_string( $honeypot ) && '' !== trim( $honeypot ) ) {
+			// Look successful so the bot learns nothing; nothing is stored or mailed.
+			return $this->lead_response( true, 'lead_sent', $language, 200 );
+		}
+
 		$client_ip = $this->client_ip();
-		if ( ! $this->rate_limit_allows( $client_ip ) ) {
-			return $this->rate_limited( $language, 60 );
+		if ( ! $this->lead_rate_limit_allows( $client_ip ) ) {
+			return $this->rate_limited( $language, self::LEAD_WINDOW );
 		}
 
-		$name    = trim( sanitize_text_field( (string) $request->get_param( 'name' ) ) );
-		$email   = trim( sanitize_email( (string) $request->get_param( 'email' ) ) );
-		$company = trim( sanitize_text_field( (string) $request->get_param( 'company' ) ) );
-		$message = trim( sanitize_textarea_field( (string) $request->get_param( 'message' ) ) );
-
-		if ( '' === $name || ! is_email( $email ) ) {
-			return new \WP_REST_Response(
-				array(
-					'success' => false,
-					'message' => __( 'Please provide a valid name and email address.', 'wp-knowledge-chat' ),
-				),
-				400
-			);
+		$fields = array();
+		foreach ( array( 'name', 'email', 'company', 'message' ) as $field ) {
+			$value            = $request->get_param( $field );
+			$fields[ $field ] = is_string( $value ) ? $value : '';
+		}
+		if ( null === Analytics::clean_lead( $fields ) ) {
+			return $this->lead_response( false, 'lead_invalid', $language, 400 );
 		}
 
-		Analytics::save_lead(
-			array(
-				'name'    => $name,
-				'email'   => $email,
-				'company' => $company,
-				'message' => $message,
-			)
-		);
+		$fields['language'] = $language;
+		if ( ! Analytics::save_lead( $fields ) ) {
+			return $this->lead_response( false, 'lead_failed', $language, 500 );
+		}
 
-		return new \WP_REST_Response(
-			array(
-				'success' => true,
-				'message' => __( 'Thank you! Your consultation request has been sent to the Inpartner team.', 'wp-knowledge-chat' ),
+		return $this->lead_response( true, 'lead_sent', $language, 200 );
+	}
+
+	/**
+	 * Fixed-window counters in transients: per visitor (salted hash of the IP)
+	 * and site-wide. Separate from the chat limit, so chatting does not block
+	 * a lead and leads cannot be used to spam the administrator's inbox.
+	 */
+	private function lead_rate_limit_allows( string $ip ): bool {
+		/**
+		 * Filters the site-wide maximum of lead submissions per hour.
+		 *
+		 * @param int $limit Default 30.
+		 */
+		$global_limit = max( 1, (int) apply_filters( 'wp_knowledge_chat_lead_limit_per_hour', self::LEAD_LIMIT_PER_HOUR ) );
+		$now          = time();
+		$visitor_key  = 'wkc_lead_' . substr( hash_hmac( 'sha256', $ip . '|' . intdiv( $now, self::LEAD_WINDOW ), wp_salt( 'nonce' ) ), 0, 32 );
+		$global_key   = 'wkc_lead_all_' . intdiv( $now, HOUR_IN_SECONDS );
+
+		$visitor = (int) get_transient( $visitor_key );
+		$global  = (int) get_transient( $global_key );
+		if ( $visitor >= self::LEAD_LIMIT_PER_VISITOR || $global >= $global_limit ) {
+			return false;
+		}
+		set_transient( $visitor_key, $visitor + 1, self::LEAD_WINDOW + 5 );
+		set_transient( $global_key, $global + 1, HOUR_IN_SECONDS + 5 );
+		return true;
+	}
+
+	private function lead_response( bool $success, string $code, string $language, int $status ): \WP_REST_Response {
+		$messages = array(
+			'en' => array(
+				'lead_sent'    => 'Thank you! Your consultation request has been sent to the Inpartner team.',
+				'lead_invalid' => 'Please provide a valid name and email address (and keep each field within its length limit).',
+				'lead_failed'  => 'Your request could not be saved. Please use the contact link instead.',
 			),
-			200
+			'id' => array(
+				'lead_sent'    => 'Terima kasih! Permintaan konsultasi Anda telah dikirim ke tim Inpartner.',
+				'lead_invalid' => 'Silakan isi nama dan alamat email yang valid (dan jangan melebihi batas panjang setiap kolom).',
+				'lead_failed'  => 'Permintaan Anda tidak dapat disimpan. Silakan gunakan tautan kontak.',
+			),
+			'ko' => array(
+				'lead_sent'    => '감사합니다! Inpartner 자문팀으로 상담 요청이 전송되었습니다.',
+				'lead_invalid' => '올바른 성함과 이메일 주소를 입력해 주세요(각 항목의 글자 수 제한을 지켜 주세요).',
+				'lead_failed'  => '요청을 저장하지 못했습니다. 연락처 링크를 이용해 주세요.',
+			),
 		);
+		$lang     = isset( $messages[ $language ] ) ? $language : 'en';
+		$response = new \WP_REST_Response(
+			array(
+				'success' => $success,
+				'code'    => $code,
+				'message' => $messages[ $lang ][ $code ],
+			),
+			$status
+		);
+		$response->header( 'Cache-Control', 'no-store, private' );
+		return $response;
 	}
 
 	/**

@@ -52,7 +52,9 @@
 			leadSubmit: 'Send Request',
 			leadCancel: 'Cancel',
 			leadSuccess: 'Thank you! Your consultation request has been sent to the Inpartner team.',
-			leadError: 'Please provide a valid name and email address.'
+			leadError: 'Please provide a valid name and email address.',
+			leadFailed: 'Your request could not be sent. Please try again later or use the contact link.',
+			leadPrivacy: 'Your details are sent to the Inpartner team only to answer this request.'
 		},
 		id: {
 			title: 'Asisten AI Inpartner',
@@ -91,7 +93,9 @@
 			leadSubmit: 'Kirim Permintaan',
 			leadCancel: 'Batal',
 			leadSuccess: 'Terima kasih! Permintaan konsultasi Anda telah dikirim ke tim Inpartner.',
-			leadError: 'Silakan isi nama dan alamat email yang valid.'
+			leadError: 'Silakan isi nama dan alamat email yang valid.',
+			leadFailed: 'Permintaan Anda tidak dapat dikirim. Silakan coba lagi nanti atau gunakan tautan kontak.',
+			leadPrivacy: 'Data Anda hanya dikirim ke tim Inpartner untuk menanggapi permintaan ini.'
 		},
 		ko: {
 			title: 'Inpartner AI 어시스턴트',
@@ -359,38 +363,58 @@
 			return a;
 		}
 
+		var leadFormCount = 0;
+		var LEAD_LIMITS = { name: 100, email: 254, company: 150, message: 2000 };
+
 		function renderLeadForm(parentItem) {
 			if (parentItem.querySelector('.wkc-lead-card')) return;
-			var card = el('div', { class: 'wkc-lead-card' });
-			var formTitle = el('p', { class: 'wkc-lead-title' }, t.requestConsult);
-			card.appendChild(formTitle);
+			var uid = 'wkc-lead-' + ++leadFormCount;
+			var card = el('form', { class: 'wkc-lead-card', 'aria-labelledby': uid + '-title', novalidate: 'novalidate' });
+			card.appendChild(el('p', { class: 'wkc-lead-title', id: uid + '-title' }, t.requestConsult));
 
-			var nameInput = el('input', { type: 'text', class: 'wkc-lead-input', placeholder: t.leadName });
-			var emailInput = el('input', { type: 'email', class: 'wkc-lead-input', placeholder: t.leadEmail });
-			var compInput = el('input', { type: 'text', class: 'wkc-lead-input', placeholder: t.leadCompany });
-			var msgInput = el('textarea', { class: 'wkc-lead-textarea', rows: '2', placeholder: t.leadMessage });
+			function field(name, tag, attrs, label) {
+				var id = uid + '-' + name;
+				var wrap = el('div', { class: 'wkc-lead-field' });
+				wrap.appendChild(el('label', { class: 'wkc-sr-only', for: id }, label));
+				attrs.id = id;
+				attrs.name = name;
+				attrs.placeholder = label;
+				attrs.maxlength = String(LEAD_LIMITS[name]);
+				var control = el(tag, attrs);
+				wrap.appendChild(control);
+				card.appendChild(wrap);
+				return control;
+			}
 
-			card.appendChild(nameInput);
-			card.appendChild(emailInput);
-			card.appendChild(compInput);
-			card.appendChild(msgInput);
+			var nameInput = field('name', 'input', { type: 'text', class: 'wkc-lead-input', autocomplete: 'name', required: 'required' }, t.leadName);
+			var emailInput = field('email', 'input', { type: 'email', class: 'wkc-lead-input', autocomplete: 'email', required: 'required' }, t.leadEmail);
+			var compInput = field('company', 'input', { type: 'text', class: 'wkc-lead-input', autocomplete: 'organization' }, t.leadCompany);
+			var msgInput = field('message', 'textarea', { class: 'wkc-lead-textarea', rows: '2' }, t.leadMessage);
 
-			var leadErr = el('div', { class: 'wkc-lead-error', 'aria-live': 'polite' });
+			// Honeypot: invisible to people and assistive technology, filled in by naive bots.
+			var trap = el('input', { type: 'text', name: 'website', tabindex: '-1', autocomplete: 'off', 'aria-hidden': 'true', class: 'wkc-lead-hp' });
+			card.appendChild(trap);
+
+			card.appendChild(el('p', { class: 'wkc-lead-privacy' }, t.leadPrivacy));
+			var leadErr = el('div', { class: 'wkc-lead-error', role: 'alert', 'aria-live': 'assertive' });
 			card.appendChild(leadErr);
 
 			var btnRow = el('div', { class: 'wkc-lead-actions' });
-			var submitBtn = el('button', { type: 'button', class: 'wkc-lead-submit' }, t.leadSubmit);
+			var submitBtn = el('button', { type: 'submit', class: 'wkc-lead-submit' }, t.leadSubmit);
 			var cancelBtn = el('button', { type: 'button', class: 'wkc-lead-cancel' }, t.leadCancel);
 
 			cancelBtn.addEventListener('click', function () {
 				card.remove();
+				input.focus();
 			});
 
-			submitBtn.addEventListener('click', function () {
+			card.addEventListener('submit', function (e) {
+				e.preventDefault();
 				var nameVal = nameInput.value.trim();
 				var emailVal = emailInput.value.trim();
-				if (!nameVal || !emailVal || emailVal.indexOf('@') === -1) {
+				if (!nameVal || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailVal)) {
 					leadErr.textContent = t.leadError;
+					(nameVal ? emailInput : nameInput).focus();
 					return;
 				}
 				submitBtn.disabled = true;
@@ -406,17 +430,34 @@
 						name: nameVal,
 						email: emailVal,
 						company: compInput.value.trim(),
-						message: msgInput.value.trim()
+						message: msgInput.value.trim(),
+						language: lang,
+						website: trap.value
 					})
 				})
-					.then(function (res) { return res.json(); })
-					.then(function (data) {
-						card.remove();
-						addMessage({
-							role: 'bot',
-							text: (data && data.message) ? data.message : t.leadSuccess,
-							grounded: true
-						});
+					.then(function (res) {
+						return res
+							.json()
+							.catch(function () {
+								return null;
+							})
+							.then(function (data) {
+								return { ok: res.ok, status: res.status, data: data };
+							});
+					})
+					.then(function (result) {
+						if (result.ok && result.data && result.data.success === true) {
+							card.remove();
+							// A notice, not part of the conversation: it is neither stored nor sent to the assistant as context.
+							renderMessage({ role: 'bot', text: t.leadSuccess, grounded: true, isGreeting: true });
+							status.textContent = t.leadSuccess;
+							input.focus();
+							return;
+						}
+						// Keep what the visitor typed so they can correct it or try again.
+						submitBtn.disabled = false;
+						cancelBtn.disabled = false;
+						leadErr.textContent = result.status === 400 ? t.leadError : result.status === 429 ? t.errRate : t.leadFailed;
 					})
 					.catch(function () {
 						submitBtn.disabled = false;

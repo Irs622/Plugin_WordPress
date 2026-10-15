@@ -587,7 +587,23 @@
 #wkc-root .wkc-lead-textarea:focus {
 	border-color: var(--wkc-brand);
 	background: #ffffff;
-	outline: none;
+	/* Visible focus indicator (a border-colour change alone is too subtle). */
+	outline: 2px solid var(--wkc-brand);
+	outline-offset: 1px;
+}
+
+#wkc-root .wkc-lead-hp {
+	position: absolute !important;
+	left: -10000px !important;
+	width: 1px !important;
+	height: 1px !important;
+	overflow: hidden !important;
+}
+
+#wkc-root .wkc-lead-privacy {
+	font-size: 11.5px;
+	color: var(--wkc-muted, #50575e);
+	margin: 0 0 6px;
 }
 
 #wkc-root .wkc-lead-error {

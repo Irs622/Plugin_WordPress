@@ -446,3 +446,76 @@ describe('languages', () => {
 		assert.deepEqual($$('.wkc-lang').map((b) => b.getAttribute('lang')), ['en', 'id', 'ko']);
 	});
 });
+
+describe('consultation request form', () => {
+	async function openForm(leadResponse) {
+		const ctx = await setup({ responses: [jsonResponse(200, { answer: 'Fallback text', sources: [], grounded: false }), leadResponse] });
+		ctx.$('.wkc-launcher').click();
+		ctx.type('How much does it cost?');
+		ctx.pressEnter();
+		await ctx.flush();
+		ctx.$('.wkc-lead-btn').click();
+		return ctx;
+	}
+	function fill(ctx, name, email) {
+		ctx.$('.wkc-lead-card [name="name"]').value = name;
+		ctx.$('.wkc-lead-card [name="email"]').value = email;
+		ctx.$('.wkc-lead-card [name="message"]').value = 'Market entry';
+	}
+	const submit = (ctx) => ctx.$('.wkc-lead-card').dispatchEvent(new ctx.window.Event('submit', { bubbles: true, cancelable: true }));
+
+	it('labels every field, limits lengths and hides the honeypot from assistive technology', async () => {
+		const ctx = await openForm();
+		for (const name of ['name', 'email', 'company', 'message']) {
+			const field = ctx.$(`.wkc-lead-card [name="${name}"]`);
+			const label = ctx.$(`.wkc-lead-card label[for="${field.id}"]`);
+			assert.ok(label && label.textContent.trim(), `${name} has a label`);
+			assert.ok(Number(field.getAttribute('maxlength')) > 0, `${name} has maxlength`);
+		}
+		const trap = ctx.$('.wkc-lead-card [name="website"]');
+		assert.equal(trap.getAttribute('aria-hidden'), 'true');
+		assert.equal(trap.getAttribute('tabindex'), '-1');
+		assert.ok(ctx.$('.wkc-lead-privacy').textContent.length > 0);
+		assert.equal(ctx.window.document.activeElement, ctx.$('.wkc-lead-card [name="name"]'));
+	});
+
+	it('sends the visitor language and honeypot, and shows a confirmation that is not stored as conversation', async () => {
+		const ctx = await openForm(jsonResponse(200, { success: true, code: 'lead_sent', message: 'server text' }));
+		fill(ctx, 'Jane', 'jane@company.com');
+		submit(ctx);
+		await ctx.flush();
+		await ctx.flush();
+		const lead = ctx.calls[1];
+		assert.match(lead.url, /\/lead$/);
+		assert.equal(lead.body.language, 'en');
+		assert.equal(lead.body.website, '');
+		assert.equal(ctx.$('.wkc-lead-card'), null);
+		assert.ok(ctx.$$('.wkc-msg--bot').some((m) => m.textContent.includes('Thank you')));
+		const stored = JSON.parse(ctx.window.sessionStorage.getItem('wkc-history-v1'));
+		assert.ok(!stored.some((m) => m.text.includes('Thank you')), 'confirmation is not sent back to the assistant as history');
+	});
+
+	it('keeps the form and the typed data when the server rejects or rate-limits the request', async () => {
+		for (const [status, expected] of [[400, 'valid name'], [429, 'too quickly'], [500, 'could not be sent']]) {
+			const ctx = await openForm(jsonResponse(status, { success: false, code: 'x', message: 'server' }));
+			fill(ctx, 'Jane', 'jane@company.com');
+			submit(ctx);
+			await ctx.flush();
+			await ctx.flush();
+			assert.ok(ctx.$('.wkc-lead-card'), `form stays after HTTP ${status}`);
+			assert.equal(ctx.$('.wkc-lead-card [name="name"]').value, 'Jane');
+			assert.match(ctx.$('.wkc-lead-error').textContent, new RegExp(expected));
+			assert.equal(ctx.$('.wkc-lead-submit').disabled, false);
+			assert.ok(!ctx.$$('.wkc-msg--bot').some((m) => m.textContent.includes('Thank you')), `no success message after HTTP ${status}`);
+		}
+	});
+
+	it('validates the e-mail address before sending', async () => {
+		const ctx = await openForm();
+		fill(ctx, 'Jane', 'not-an-email');
+		submit(ctx);
+		await ctx.flush();
+		assert.equal(ctx.calls.length, 1, 'no lead request sent');
+		assert.match(ctx.$('.wkc-lead-error').textContent, /valid name and email/);
+	});
+});
