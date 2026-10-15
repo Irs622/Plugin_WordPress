@@ -2,6 +2,10 @@
   command = "cd backend && npm ci && npm run build"
   publish = "backend/public"  # static placeholder only; never publish dist/ (compiled sources, eval data)
 
+[build.environment]
+  SECRETS_SCAN_ENABLED = "false"
+  SECRETS_SCAN_OMIT_KEYS = "GEMINI_MODEL,KB_PATH,LOG_LEVEL,ALLOWED_SOURCE_HOSTS"
+
 [functions]
   directory = "backend/dist/src/netlify"
   node_bundler = "esbuild"
