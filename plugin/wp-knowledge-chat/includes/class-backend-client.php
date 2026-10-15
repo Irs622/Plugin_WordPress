@@ -163,9 +163,10 @@ final class Backend_Client {
 	 * @param array<int,array{id:string,title:string,url:string,text:string,category:string,status:string,updated_at:string}> $documents
 	 * @param array<int,string> $delete_ids
 	 * @param bool              $replace_all
+	 * @param int               $timeout     Seconds; automatic updates during a page save use a short one.
 	 * @return array{status:int, body:mixed}|\WP_Error
 	 */
-	public static function index( array $documents, array $delete_ids = array(), bool $replace_all = false ) {
+	public static function index( array $documents, array $delete_ids = array(), bool $replace_all = false, int $timeout = 30 ) {
 		if ( ! self::is_index_configured() ) {
 			return new \WP_Error( 'wkc_index_not_configured', 'Index token or backend URL is not configured.' );
 		}
@@ -179,7 +180,7 @@ final class Backend_Client {
 		$response = wp_remote_post(
 			self::base_url() . '/api/index',
 			array(
-				'timeout'             => 30,
+				'timeout'             => max( 1, $timeout ),
 				'redirection'         => 0,
 				'limit_response_size' => 65536,
 				'headers'             => array(

@@ -23,5 +23,6 @@
   <php>
     <env name="WKC_BACKEND_URL" value="http://127.0.0.1:8787" force="true"/>
     <env name="WKC_SHARED_SECRET" value="phpunit-shared-secret-0123456789abcdef0123" force="true"/>
+    <env name="WKC_INDEX_TOKEN" value="phpunit-index-token-0123456789abcdef01234567" force="true"/>
   </php>
 </phpunit>
