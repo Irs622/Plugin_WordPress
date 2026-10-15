@@ -112,7 +112,7 @@ Full list with versions and the reasons for each choice: [docs/tech-stack.md](do
 Requirements: Node.js ≥ 20.11, PHP ≥ 8.1 with `pdo_sqlite`, Composer. Google Chrome is needed for browser tests only.
 
 ```bash
-git clone https://github.com/Irs622/Plugin_WordPress.git
+git clone https://github.com/inpartnerhub/Plugin_WordPress.git
 cd Plugin_WordPress
 
 # 1. Backend

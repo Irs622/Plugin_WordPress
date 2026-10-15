@@ -3,7 +3,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WP Knowledge Chat 0.2.0\n"
-"Report-Msgid-Bugs-To: https://github.com/Irs622/Plugin_WordPress/issues\n"
+"Report-Msgid-Bugs-To: https://github.com/inpartnerhub/Plugin_WordPress/issues\n"
 "Last-Translator: Inpartner\n"
 "Language-Team: Korean\n"
 "MIME-Version: 1.0\n"
