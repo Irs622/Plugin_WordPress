@@ -77,7 +77,7 @@ final class Backend_Client {
 	 */
 	public static function chat( string $message, string $language, string $client_id, array $history = array() ) {
 		if ( ! self::is_configured() ) {
-			return new \WP_Error( 'wkc_not_configured', 'Backend is not configured.' );
+			return new \WP_Error( 'wkc_not_configured', __( 'Backend is not configured.', 'wp-knowledge-chat' ) );
 		}
 
 		$payload = array(
@@ -168,7 +168,7 @@ final class Backend_Client {
 	 */
 	public static function index( array $documents, array $delete_ids = array(), bool $replace_all = false, int $timeout = 30 ) {
 		if ( ! self::is_index_configured() ) {
-			return new \WP_Error( 'wkc_index_not_configured', 'Index token or backend URL is not configured.' );
+			return new \WP_Error( 'wkc_index_not_configured', __( 'Index token or backend URL is not configured.', 'wp-knowledge-chat' ) );
 		}
 
 		$payload = array(

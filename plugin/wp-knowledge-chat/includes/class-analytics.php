@@ -51,7 +51,7 @@ final class Analytics {
 		register_post_type(
 			self::LEAD_POST_TYPE,
 			array(
-				'label'               => 'WP Knowledge Chat leads',
+				'label'               => __( 'WP Knowledge Chat leads', 'wp-knowledge-chat' ),
 				'public'              => false,
 				'publicly_queryable'  => false,
 				'show_ui'             => false,

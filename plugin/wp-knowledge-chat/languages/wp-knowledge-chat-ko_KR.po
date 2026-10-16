@@ -190,3 +190,39 @@ msgstr "인사말은 %d자 이하여야 합니다."
 #, php-format
 msgid "Contact URL must be an absolute https:// URL on an approved domain (%s), without credentials or a custom port."
 msgstr "문의 URL은 승인된 도메인(%s)의 절대 https:// URL이어야 하며, 자격 증명이나 사용자 지정 포트를 포함할 수 없습니다."
+
+#: includes
+msgid "WP Knowledge Chat leads"
+msgstr "WP Knowledge Chat 상담 요청"
+
+#: includes
+msgid "Backend is not configured."
+msgstr "백엔드가 구성되지 않았습니다."
+
+#: includes
+msgid "Index token or backend URL is not configured."
+msgstr "인덱스 토큰 또는 백엔드 URL이 구성되지 않았습니다."
+
+#: includes
+msgid "Service"
+msgstr "서비스"
+
+#: includes
+msgid "About"
+msgstr "소개"
+
+#: includes
+msgid "Contact"
+msgstr "연락처"
+
+#: includes
+msgid "FAQ"
+msgstr "FAQ"
+
+#: includes
+msgid "Home"
+msgstr "홈"
+
+#: includes
+msgid "Article"
+msgstr "기사"

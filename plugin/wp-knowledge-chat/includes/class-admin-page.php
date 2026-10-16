@@ -26,10 +26,29 @@ final class Admin_Page {
 
 	public function hooks(): void {
 		add_action( 'admin_menu', array( $this, 'add_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 		add_action( 'admin_init', array( $this, 'add_fields' ) );
 		add_action( 'admin_post_' . self::HEALTH_ACTION, array( $this, 'handle_test_connection' ) );
 		add_action( 'admin_post_' . self::SYNC_ACTION, array( $this, 'handle_sync' ) );
 		add_action( 'admin_post_' . self::LEADS_ACTION, array( $this, 'handle_leads_action' ) );
+	}
+
+	/**
+	 * Loads the admin script and stylesheet on this plugin's screens only.
+	 *
+	 * @param string $hook_suffix Current admin page.
+	 */
+	public function enqueue_assets( string $hook_suffix ): void {
+		$screens = array(
+			'toplevel_page_' . self::SLUG,
+			self::SLUG . '_page_' . self::SYNC_SLUG,
+			self::SLUG . '_page_' . self::LEADS_SLUG,
+		);
+		if ( ! in_array( $hook_suffix, $screens, true ) ) {
+			return;
+		}
+		wp_enqueue_style( 'wkc-admin', WP_KNOWLEDGE_CHAT_URL . 'assets/css/admin.css', array(), WP_KNOWLEDGE_CHAT_VERSION );
+		wp_enqueue_script( 'wkc-admin', WP_KNOWLEDGE_CHAT_URL . 'assets/js/admin.js', array(), WP_KNOWLEDGE_CHAT_VERSION, array( 'in_footer' => true ) );
 	}
 
 	public function add_menu(): void {
@@ -215,7 +234,7 @@ final class Admin_Page {
 			delete_transient( 'wkc_health_' . get_current_user_id() );
 		}
 		?>
-		<div class="card" style="max-width:720px">
+		<div class="card wkc-card-status">
 			<h2><?php esc_html_e( 'AI backend', 'wp-knowledge-chat' ); ?></h2>
 			<?php if ( $configured ) : ?>
 				<p><strong><?php esc_html_e( 'Configured.', 'wp-knowledge-chat' ); ?></strong>
@@ -246,10 +265,10 @@ final class Admin_Page {
 				<?php submit_button( __( 'Test connection', 'wp-knowledge-chat' ), 'secondary', 'submit', false, $configured ? array() : array( 'disabled' => 'disabled' ) ); ?>
 			</form>
 			<?php if ( Backend_Client::is_index_configured() ) : ?>
-				<p style="margin-top:16px;"><strong><?php esc_html_e( 'Index API token configured.', 'wp-knowledge-chat' ); ?></strong>
+				<p class="wkc-mt"><strong><?php esc_html_e( 'Index API token configured.', 'wp-knowledge-chat' ); ?></strong>
 				<?php esc_html_e( 'Knowledge base synchronization from WordPress pages is enabled.', 'wp-knowledge-chat' ); ?></p>
 			<?php else : ?>
-				<p style="margin-top:16px;"><em><?php esc_html_e( 'Note: To enable page synchronization to the AI backend, define WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN in wp-config.php.', 'wp-knowledge-chat' ); ?></em></p>
+				<p class="wkc-mt"><em><?php esc_html_e( 'Note: To enable page synchronization to the AI backend, define WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN in wp-config.php.', 'wp-knowledge-chat' ); ?></em></p>
 			<?php endif; ?>
 		</div>
 		<?php
@@ -300,7 +319,7 @@ final class Admin_Page {
 						<strong><?php esc_html_e( 'Automatic updates failed:', 'wp-knowledge-chat' ); ?></strong>
 						<?php esc_html_e( 'the AI backend still has an outdated copy of these pages (an unpublished page may still be answered from). They are retried every few minutes.', 'wp-knowledge-chat' ); ?>
 					</p>
-					<ul style="list-style:disc;margin-left:20px;">
+					<ul class="wkc-list">
 						<?php foreach ( $pending as $pending_id => $info ) : ?>
 							<li>
 								<?php
@@ -318,7 +337,7 @@ final class Admin_Page {
 							</li>
 						<?php endforeach; ?>
 					</ul>
-					<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" style="margin-bottom:8px;">
+					<form action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" method="post" class="wkc-mb">
 						<input type="hidden" name="action" value="<?php echo esc_attr( self::SYNC_ACTION ); ?>" />
 						<?php wp_nonce_field( self::SYNC_ACTION, self::SYNC_NONCE ); ?>
 						<button type="submit" name="sync_mode" value="retry" class="button"><?php esc_html_e( 'Retry now', 'wp-knowledge-chat' ); ?></button>
@@ -343,14 +362,14 @@ final class Admin_Page {
 				<input type="hidden" name="action" value="<?php echo esc_attr( self::SYNC_ACTION ); ?>" />
 				<?php wp_nonce_field( self::SYNC_ACTION, self::SYNC_NONCE ); ?>
 
-				<div class="tablenav top" style="display:flex;align-items:center;gap:12px;margin:12px 0;">
+				<div class="tablenav top wkc-tablenav">
 					<button type="submit" name="sync_mode" value="selected" class="button button-primary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
 						<?php esc_html_e( 'Sync Selected Pages', 'wp-knowledge-chat' ); ?>
 					</button>
 					<button type="submit" name="sync_mode" value="all" class="button button-secondary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
 						<?php esc_html_e( 'Sync All Eligible Pages', 'wp-knowledge-chat' ); ?>
 					</button>
-					<label style="margin-left:auto;">
+					<label class="wkc-ml-auto">
 						<input type="checkbox" name="replace_all" value="1" />
 						<?php esc_html_e( 'Replace entire backend knowledge base (prune unselected)', 'wp-knowledge-chat' ); ?>
 					</label>
@@ -359,13 +378,13 @@ final class Admin_Page {
 				<table class="wp-list-table widefat fixed striped">
 					<thead>
 						<tr>
-							<th scope="col" class="manage-column column-cb check-column" style="width:3em;">
+							<th scope="col" class="manage-column column-cb check-column wkc-w-cb">
 								<input type="checkbox" id="wkc-select-all" />
 							</th>
 							<th scope="col" class="manage-column column-primary"><?php esc_html_e( 'Page Title', 'wp-knowledge-chat' ); ?></th>
-							<th scope="col" class="manage-column" style="width:140px;"><?php esc_html_e( 'Category', 'wp-knowledge-chat' ); ?></th>
-							<th scope="col" class="manage-column" style="width:160px;"><?php esc_html_e( 'Content Size', 'wp-knowledge-chat' ); ?></th>
-							<th scope="col" class="manage-column" style="width:160px;"><?php esc_html_e( 'Last Modified', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column wkc-w-140"><?php esc_html_e( 'Category', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column wkc-w-160"><?php esc_html_e( 'Content Size', 'wp-knowledge-chat' ); ?></th>
+							<th scope="col" class="manage-column wkc-w-160"><?php esc_html_e( 'Last Modified', 'wp-knowledge-chat' ); ?></th>
 						</tr>
 					</thead>
 					<tbody>
@@ -393,16 +412,16 @@ final class Admin_Page {
 										<select name="categories[<?php echo esc_attr( (string) $page['id'] ); ?>]">
 											<?php foreach ( $categories as $cat ) : ?>
 												<option value="<?php echo esc_attr( $cat ); ?>" <?php selected( $page['category'], $cat ); ?>>
-													<?php echo esc_html( ucfirst( $cat ) ); ?>
+													<?php echo esc_html( self::category_label( $cat ) ); ?>
 												</option>
 											<?php endforeach; ?>
 										</select>
 									</td>
 									<td>
 										<?php if ( ! empty( $page['protected'] ) ) : ?>
-											<span style="color:#b32d2e;"><?php esc_html_e( 'Password protected (never indexed)', 'wp-knowledge-chat' ); ?></span>
+											<span class="wkc-bad"><?php esc_html_e( 'Password protected (never indexed)', 'wp-knowledge-chat' ); ?></span>
 										<?php elseif ( $page['eligible'] ) : ?>
-											<span style="color:#007017;">
+											<span class="wkc-good">
 												<?php
 												printf(
 													/* translators: %d: character count */
@@ -412,7 +431,7 @@ final class Admin_Page {
 												?>
 											</span>
 										<?php else : ?>
-											<span style="color:#b32d2e;">
+											<span class="wkc-bad">
 												<?php
 												printf(
 													/* translators: %d: character count */
@@ -446,7 +465,7 @@ final class Admin_Page {
 					</tfoot>
 				</table>
 
-				<div class="tablenav bottom" style="display:flex;align-items:center;gap:12px;margin:12px 0;">
+				<div class="tablenav bottom wkc-tablenav">
 					<button type="submit" name="sync_mode" value="selected" class="button button-primary" <?php disabled( ! $index_configured || empty( $pages ) ); ?>>
 						<?php esc_html_e( 'Sync Selected Pages', 'wp-knowledge-chat' ); ?>
 					</button>
@@ -456,20 +475,6 @@ final class Admin_Page {
 				</div>
 			</form>
 		</div>
-		<script>
-		document.addEventListener('DOMContentLoaded', function() {
-			var topAll = document.getElementById('wkc-select-all');
-			var botAll = document.getElementById('wkc-select-all-bottom');
-			var boxes = document.querySelectorAll('.wkc-page-checkbox:not(:disabled)');
-			function syncAll(checked) {
-				boxes.forEach(function(b) { b.checked = checked; });
-				if (topAll) topAll.checked = checked;
-				if (botAll) botAll.checked = checked;
-			}
-			if (topAll) topAll.addEventListener('change', function() { syncAll(this.checked); });
-			if (botAll) botAll.addEventListener('change', function() { syncAll(this.checked); });
-		});
-		</script>
 		<?php
 	}
 
@@ -563,26 +568,26 @@ final class Admin_Page {
 				<div class="notice notice-success is-dismissible"><p><?php echo esc_html( $notice ); ?></p></div>
 			<?php endif; ?>
 
-			<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin:20px 0;">
-				<div class="card" style="margin:0;padding:16px;">
-					<h3 style="margin-top:0;color:#50575e;"><?php esc_html_e( 'Total Conversations', 'wp-knowledge-chat' ); ?></h3>
-					<div style="font-size:28px;font-weight:700;color:#1d2327;"><?php echo (int) $total; ?></div>
-					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Total questions asked by visitors', 'wp-knowledge-chat' ); ?></p>
+			<div class="wkc-stats">
+				<div class="card wkc-stat">
+					<h3 class="wkc-stat-title"><?php esc_html_e( 'Total Conversations', 'wp-knowledge-chat' ); ?></h3>
+					<div class="wkc-stat-value"><?php echo (int) $total; ?></div>
+					<p class="wkc-stat-note"><?php esc_html_e( 'Total questions asked by visitors', 'wp-knowledge-chat' ); ?></p>
 				</div>
-				<div class="card" style="margin:0;padding:16px;">
-					<h3 style="margin-top:0;color:#007017;"><?php esc_html_e( 'Answered from Knowledge', 'wp-knowledge-chat' ); ?></h3>
-					<div style="font-size:28px;font-weight:700;color:#007017;"><?php echo (int) $grounded; ?> <span style="font-size:16px;font-weight:400;">(<?php echo (int) $answered_pct; ?>%)</span></div>
-					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Supported by official website sources', 'wp-knowledge-chat' ); ?></p>
+				<div class="card wkc-stat">
+					<h3 class="wkc-stat-title wkc-good"><?php esc_html_e( 'Answered from Knowledge', 'wp-knowledge-chat' ); ?></h3>
+					<div class="wkc-stat-value wkc-good"><?php echo (int) $grounded; ?> <span class="wkc-stat-pct">(<?php echo (int) $answered_pct; ?>%)</span></div>
+					<p class="wkc-stat-note"><?php esc_html_e( 'Supported by official website sources', 'wp-knowledge-chat' ); ?></p>
 				</div>
-				<div class="card" style="margin:0;padding:16px;">
-					<h3 style="margin-top:0;color:#b32d2e;"><?php esc_html_e( 'Consultation Fallbacks', 'wp-knowledge-chat' ); ?></h3>
-					<div style="font-size:28px;font-weight:700;color:#b32d2e;"><?php echo (int) $fallback; ?> <span style="font-size:16px;font-weight:400;">(<?php echo (int) $fallback_pct; ?>%)</span></div>
-					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Directed to consultation / contact link', 'wp-knowledge-chat' ); ?></p>
+				<div class="card wkc-stat">
+					<h3 class="wkc-stat-title wkc-bad"><?php esc_html_e( 'Consultation Fallbacks', 'wp-knowledge-chat' ); ?></h3>
+					<div class="wkc-stat-value wkc-bad"><?php echo (int) $fallback; ?> <span class="wkc-stat-pct">(<?php echo (int) $fallback_pct; ?>%)</span></div>
+					<p class="wkc-stat-note"><?php esc_html_e( 'Directed to consultation / contact link', 'wp-knowledge-chat' ); ?></p>
 				</div>
-				<div class="card" style="margin:0;padding:16px;">
-					<h3 style="margin-top:0;color:#2271b1;"><?php esc_html_e( 'Captured Leads', 'wp-knowledge-chat' ); ?></h3>
-					<div style="font-size:28px;font-weight:700;color:#2271b1;"><?php echo (int) $lead_count; ?></div>
-					<p style="margin:6px 0 0;color:#646970;font-size:12px;"><?php esc_html_e( 'Prospective clients requesting consultation', 'wp-knowledge-chat' ); ?></p>
+				<div class="card wkc-stat">
+					<h3 class="wkc-stat-title wkc-link"><?php esc_html_e( 'Captured Leads', 'wp-knowledge-chat' ); ?></h3>
+					<div class="wkc-stat-value wkc-link"><?php echo (int) $lead_count; ?></div>
+					<p class="wkc-stat-note"><?php esc_html_e( 'Prospective clients requesting consultation', 'wp-knowledge-chat' ); ?></p>
 				</div>
 			</div>
 
@@ -595,21 +600,21 @@ final class Admin_Page {
 					?>
 				</p>
 			<?php endif; ?>
-			<div style="display:flex;gap:8px;margin:8px 0;">
+			<div class="wkc-actions">
 				<?php $this->leads_button( 'export', __( 'Export CSV', 'wp-knowledge-chat' ), 'button' ); ?>
 				<?php $this->leads_button( 'delete_all', __( 'Delete all leads', 'wp-knowledge-chat' ), 'button button-link-delete', __( 'Permanently delete all leads? This cannot be undone.', 'wp-knowledge-chat' ) ); ?>
 				<?php $this->leads_button( 'reset_metrics', __( 'Reset metrics', 'wp-knowledge-chat' ), 'button', __( 'Reset all conversation counts and recent questions?', 'wp-knowledge-chat' ) ); ?>
 			</div>
-			<table class="wp-list-table widefat fixed striped" style="margin-bottom:30px;">
+			<table class="wp-list-table widefat fixed striped wkc-mb-lg">
 				<thead>
 					<tr>
-						<th scope="col" style="width:150px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:150px;"><?php esc_html_e( 'Name', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:190px;"><?php esc_html_e( 'Email', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:150px;"><?php esc_html_e( 'Company', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-150"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-150"><?php esc_html_e( 'Name', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-190"><?php esc_html_e( 'Email', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-150"><?php esc_html_e( 'Company', 'wp-knowledge-chat' ); ?></th>
 						<th scope="col"><?php esc_html_e( 'Inquiry Message', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:110px;"><?php esc_html_e( 'Notification', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:90px;"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'wp-knowledge-chat' ); ?></span></th>
+						<th scope="col" class="wkc-w-110"><?php esc_html_e( 'Notification', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-90"><span class="screen-reader-text"><?php esc_html_e( 'Actions', 'wp-knowledge-chat' ); ?></span></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -637,10 +642,10 @@ final class Admin_Page {
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
 					<tr>
-						<th scope="col" style="width:160px;"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-160"><?php esc_html_e( 'Date (UTC)', 'wp-knowledge-chat' ); ?></th>
 						<th scope="col"><?php esc_html_e( 'Question', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:100px;"><?php esc_html_e( 'Language', 'wp-knowledge-chat' ); ?></th>
-						<th scope="col" style="width:140px;"><?php esc_html_e( 'Outcome', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-100"><?php esc_html_e( 'Language', 'wp-knowledge-chat' ); ?></th>
+						<th scope="col" class="wkc-w-140"><?php esc_html_e( 'Outcome', 'wp-knowledge-chat' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
@@ -653,12 +658,12 @@ final class Admin_Page {
 							<tr>
 								<td><?php echo esc_html( $q['time'] ); ?></td>
 								<td><?php echo esc_html( $q['question'] ); ?></td>
-								<td><span class="badge" style="background:#f0f0f1;padding:2px 8px;border-radius:3px;font-size:12px;"><?php echo esc_html( strtoupper( $q['language'] ) ); ?></span></td>
+								<td><span class="wkc-badge"><?php echo esc_html( strtoupper( $q['language'] ) ); ?></span></td>
 								<td>
 									<?php if ( ! empty( $q['grounded'] ) ) : ?>
-										<span style="color:#007017;font-weight:600;"><?php esc_html_e( 'Grounded', 'wp-knowledge-chat' ); ?></span>
+										<span class="wkc-good wkc-strong"><?php esc_html_e( 'Grounded', 'wp-knowledge-chat' ); ?></span>
 									<?php else : ?>
-										<span style="color:#b32d2e;font-weight:600;"><?php esc_html_e( 'Fallback', 'wp-knowledge-chat' ); ?></span>
+										<span class="wkc-bad wkc-strong"><?php esc_html_e( 'Fallback', 'wp-knowledge-chat' ); ?></span>
 									<?php endif; ?>
 								</td>
 							</tr>
@@ -668,6 +673,18 @@ final class Admin_Page {
 			</table>
 		</div>
 		<?php
+	}
+
+	private static function category_label( string $category ): string {
+		$labels = array(
+			'service' => __( 'Service', 'wp-knowledge-chat' ),
+			'about'   => __( 'About', 'wp-knowledge-chat' ),
+			'contact' => __( 'Contact', 'wp-knowledge-chat' ),
+			'faq'     => __( 'FAQ', 'wp-knowledge-chat' ),
+			'home'    => __( 'Home', 'wp-knowledge-chat' ),
+			'article' => __( 'Article', 'wp-knowledge-chat' ),
+		);
+		return $labels[ $category ] ?? ucfirst( $category );
 	}
 
 	private static function mail_status_label( string $status ): string {
@@ -685,7 +702,7 @@ final class Admin_Page {
 	 */
 	private function leads_button( string $operation, string $label, string $class, string $confirm = '', int $lead_id = 0 ): void {
 		?>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" style="display:inline;"<?php echo '' !== $confirm ? ' onsubmit="return window.confirm(' . esc_attr( wp_json_encode( $confirm ) ) . ');"' : ''; ?>>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wkc-inline-form"<?php echo '' !== $confirm ? ' data-wkc-confirm="' . esc_attr( $confirm ) . '"' : ''; ?>>
 			<input type="hidden" name="action" value="<?php echo esc_attr( self::LEADS_ACTION ); ?>" />
 			<input type="hidden" name="operation" value="<?php echo esc_attr( $operation ); ?>" />
 			<?php if ( $lead_id > 0 ) : ?>

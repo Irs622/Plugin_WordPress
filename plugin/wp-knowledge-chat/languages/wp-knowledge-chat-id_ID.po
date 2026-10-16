@@ -190,3 +190,39 @@ msgstr "Pesan sapaan maksimal %d karakter."
 #, php-format
 msgid "Contact URL must be an absolute https:// URL on an approved domain (%s), without credentials or a custom port."
 msgstr "URL Kontak harus berupa URL https:// absolut pada domain yang disetujui (%s), tanpa kredensial atau port khusus."
+
+#: includes
+msgid "WP Knowledge Chat leads"
+msgstr "Permintaan konsultasi WP Knowledge Chat"
+
+#: includes
+msgid "Backend is not configured."
+msgstr "Backend belum dikonfigurasi."
+
+#: includes
+msgid "Index token or backend URL is not configured."
+msgstr "Token indeks atau URL backend belum dikonfigurasi."
+
+#: includes
+msgid "Service"
+msgstr "Layanan"
+
+#: includes
+msgid "About"
+msgstr "Tentang"
+
+#: includes
+msgid "Contact"
+msgstr "Kontak"
+
+#: includes
+msgid "FAQ"
+msgstr "FAQ"
+
+#: includes
+msgid "Home"
+msgstr "Beranda"
+
+#: includes
+msgid "Article"
+msgstr "Artikel"

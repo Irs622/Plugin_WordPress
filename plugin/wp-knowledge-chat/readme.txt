@@ -8,7 +8,7 @@ Stable tag: 0.2.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Inpartner AI Business Consultation Assistant: a floating chat widget that answers visitor questions from approved public website content, with source links.
+A floating chat widget that answers visitor questions from approved public website content, with source links.
 
 == Description ==
 

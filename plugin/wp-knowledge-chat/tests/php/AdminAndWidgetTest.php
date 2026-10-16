@@ -222,6 +222,35 @@ final class AdminAndWidgetTest extends TestCase {
 		$this->assertStringNotContainsString( (string) getenv( 'WKC_BACKEND_URL' ), $html );
 	}
 
+	public function test_admin_pages_have_no_inline_script_or_handlers(): void {
+		wp_set_current_user( $this->user_id( 'admin' ) );
+		$page = new Admin_Page();
+		$page->add_fields();
+		foreach ( array( 'render', 'render_sync_page', 'render_leads_page' ) as $method ) {
+			ob_start();
+			$page->$method();
+			$html = ob_get_clean();
+			$this->assertStringNotContainsString( '<script', $html, $method );
+			$this->assertStringNotContainsString( 'onsubmit=', $html, $method );
+			$this->assertStringNotContainsString( 'style="', $html, $method );
+		}
+	}
+
+	public function test_admin_assets_load_only_on_plugin_screens(): void {
+		$page = new Admin_Page();
+		$GLOBALS['wp_scripts'] = null;
+		$GLOBALS['wp_styles']  = null;
+		$page->enqueue_assets( 'edit.php' );
+		$this->assertFalse( wp_script_is( 'wkc-admin', 'enqueued' ) );
+		foreach ( array( 'toplevel_page_' . Admin_Page::SLUG, Admin_Page::SLUG . '_page_' . Admin_Page::SYNC_SLUG, Admin_Page::SLUG . '_page_' . Admin_Page::LEADS_SLUG ) as $hook ) {
+			$GLOBALS['wp_scripts'] = null;
+			$GLOBALS['wp_styles']  = null;
+			$page->enqueue_assets( $hook );
+			$this->assertTrue( wp_script_is( 'wkc-admin', 'enqueued' ), $hook );
+			$this->assertTrue( wp_style_is( 'wkc-admin', 'enqueued' ), $hook );
+		}
+	}
+
 	/* ---------- Widget loading ---------- */
 
 	public function test_widget_loads_when_enabled_and_configured(): void {

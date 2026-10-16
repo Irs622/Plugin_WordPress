@@ -1,0 +1,35 @@
+/* WP Knowledge Chat admin screens. All classes are prefixed wkc-. */
+.wkc-card-status { max-width: 720px; }
+.wkc-mt { margin-top: 16px; }
+.wkc-mb { margin-bottom: 8px; }
+.wkc-mb-lg { margin-bottom: 30px; }
+.wkc-ml-auto { margin-left: auto; }
+.wkc-list { list-style: disc; margin-left: 20px; }
+.wkc-inline-form { display: inline; }
+.wkc-tablenav { display: flex; align-items: center; gap: 12px; margin: 12px 0; }
+.wkc-actions { display: flex; gap: 8px; margin: 8px 0; }
+.wkc-w-cb { width: 3em; }
+.wkc-w-90 { width: 90px; }
+.wkc-w-100 { width: 100px; }
+.wkc-w-110 { width: 110px; }
+.wkc-w-140 { width: 140px; }
+.wkc-w-150 { width: 150px; }
+.wkc-w-160 { width: 160px; }
+.wkc-w-190 { width: 190px; }
+.wkc-good { color: #007017; }
+.wkc-bad { color: #b32d2e; }
+.wkc-link { color: #2271b1; }
+.wkc-strong { font-weight: 600; }
+.wkc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin: 20px 0; }
+.wkc-stat { margin: 0; padding: 16px; }
+.wkc-stat-title { margin-top: 0; color: #50575e; }
+.wkc-stat-value { font-size: 28px; font-weight: 700; color: #1d2327; }
+.wkc-stat-value.wkc-good { color: #007017; }
+.wkc-stat-value.wkc-bad { color: #b32d2e; }
+.wkc-stat-value.wkc-link { color: #2271b1; }
+.wkc-stat-title.wkc-good { color: #007017; }
+.wkc-stat-title.wkc-bad { color: #b32d2e; }
+.wkc-stat-title.wkc-link { color: #2271b1; }
+.wkc-stat-pct { font-size: 16px; font-weight: 400; }
+.wkc-stat-note { margin: 6px 0 0; color: #646970; font-size: 12px; }
+.wkc-badge { background: #f0f0f1; padding: 2px 8px; border-radius: 3px; font-size: 12px; }

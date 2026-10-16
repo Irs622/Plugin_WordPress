@@ -188,3 +188,39 @@ msgstr ""
 #, php-format
 msgid "Contact URL must be an absolute https:// URL on an approved domain (%s), without credentials or a custom port."
 msgstr ""
+
+#: includes
+msgid "WP Knowledge Chat leads"
+msgstr ""
+
+#: includes
+msgid "Backend is not configured."
+msgstr ""
+
+#: includes
+msgid "Index token or backend URL is not configured."
+msgstr ""
+
+#: includes
+msgid "Service"
+msgstr ""
+
+#: includes
+msgid "About"
+msgstr ""
+
+#: includes
+msgid "Contact"
+msgstr ""
+
+#: includes
+msgid "FAQ"
+msgstr ""
+
+#: includes
+msgid "Home"
+msgstr ""
+
+#: includes
+msgid "Article"
+msgstr ""
