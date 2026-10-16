@@ -1,10 +1,8 @@
 # Permintaan konten situs untuk Pemilik Situs Inpartner
 
-**Konteks.** Situs inpartnerglobal.com masih dalam pengerjaan, jadi wajar bila isinya belum sama dengan Company Profile v2.0 (sumber kebenaran untuk teks perusahaan). Dokumen ini adalah daftar yang perlu tayang di situs sebelum fakta itu dipakai chatbot. Basis pengetahuan chatbot mengikuti situs yang tayang, bukan sebaliknya.
+**Konteks.** Situs inpartnerglobal.com masih dalam pengerjaan. Company Profile / Knowledge Base v2.0 adalah sumber kebenaran, dan chatbot sekarang dibangun dari teks itu (lihat [knowledge-base.md](knowledge-base.md)). Setiap jawaban menautkan halaman situs sebagai sumber, jadi **halaman-halaman itu harus memuat teks yang sama** sebelum chatbot diluncurkan ke publik. Pada 2026-10-16 hanya 0–8% teks v2.0 ditemukan di halaman yang dikutip, dan `/faq/` memberi 404. Dokumen ini daftar apa yang perlu ditayangkan; setelah tayang, tim teknis menjalankan `kb:verify-sources --strict` yang harus lolos.
 
-**Tujuan.** Chatbot hanya boleh menjawab dari teks yang benar-benar tayang di inpartnerglobal.com, karena setiap jawaban menautkan halaman sumbernya. Versi 2.0 dari "Company Profile" berisi fakta yang belum ada di situs, jadi fakta itu dikeluarkan dari chatbot pada 2026-10-16 (hasil cek: hanya 0–8% teksnya ditemukan di halaman yang dikutip, dan `/faq/` memberi 404). Dokumen ini daftar apa yang perlu ditayangkan agar fakta tersebut bisa dipakai chatbot lagi.
-
-**Yang diminta dari Anda:** (1) setujui atau koreksi teks di bagian B, (2) jawab 4 pertanyaan di bagian A, (3) tayangkan teks yang disetujui, lalu beri tahu tim teknis. Tim teknis akan membangun ulang basis pengetahuan dan memverifikasinya terhadap situs.
+**Yang diminta dari Anda:** (1) setujui atau koreksi teks di bagian B, (2) jawab 4 pertanyaan di bagian A, (3) tayangkan teks yang disetujui, lalu beri tahu tim teknis. Tim teknis kemudian memverifikasinya terhadap situs.
 
 Status "Sekarang" di bawah dicek terhadap situs pada 2026-10-16.
 
@@ -12,7 +10,7 @@ Status "Sekarang" di bawah dicek terhadap situs pada 2026-10-16.
 
 | # | Pertanyaan | Kenapa penting | Sekarang di situs |
 |---|---|---|---|
-| A1 | **Nomor telepon resmi yang mana?** | Chatbot tidak memberi nomor sampai ini jelas. | Halaman Contact menampilkan tiga nomor: **+62 896 2831 0192**, **(406) 555-0120** (tampak seperti placeholder bawaan template) dan **+62 859-3454-8202** (di bagian "Information"). Company Profile menyebut +62 859 3454 8202. |
+| A1 | **Nomor telepon resmi yang mana?** | Chatbot memberi +62 859 3454 8202 (sesuai Company Profile). Situs harus konsisten dengan itu. | Halaman Contact menampilkan tiga nomor: **+62 896 2831 0192**, **(406) 555-0120** (tampak seperti placeholder bawaan template) dan **+62 859-3454-8202** (di bagian "Information"). Company Profile menyebut +62 859 3454 8202. |
 | A2 | **Apakah angka "90+ proyek, 70+ klien, 10+ klien terkait asing" boleh dipublikasikan?** | Angka ini hanya ada di Company Profile. Bila tayang, chatbot boleh menyebutnya dengan tautan sumber. | Belum ada di situs. |
 | A3 | **Pengalaman: "sejak 2019" atau "20+ tahun"?** | Teks Company Profile bertentangan: sejarah menyebut usaha berawal 2009 dan menjadi konsultan manajemen pada 2019, tetapi keunggulan menyebut "20+ tahun pengalaman strategic advisory". Chatbot tidak boleh mengarang jembatan di antaranya. | Belum ada. |
 | A4 | **Apakah domain email `inpartner.id` (corporatesecretary@inpartner.id) memang resmi?** Dan apakah URL Contact boleh diganti ke `https://inpartnerglobal.com/contact/`? | Dipakai sebagai kontak dan tautan "hubungi kami". | Email sudah tampil di situs; URL Contact di plugin masih homepage. |

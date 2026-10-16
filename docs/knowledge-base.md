@@ -1,18 +1,28 @@
 # Knowledge base
 
-## Status 2026-10-16: restored to the site snapshot
+## Status 2026-10-16: built from the owner's profile
 
-The knowledge base is the 5-page snapshot from commit `a895e24` (home, about-us, contact, cross-border market entry, distribution partner sourcing). `npm run kb:verify-sources` passes 5/5 against the live site. The Cross-Border M&A page is not included (optional, no usable text on the site).
+The website is still being built. The owner's **INPARTNER Knowledge Base v2.0 (September 2026)** is the source of truth for company facts, so the knowledge base is compiled from it, not from the current pages.
 
-KB v2.0 (commit `4b9e6b2`) was removed because its text is not on the pages it cites. To bring those facts back, **publish them on the site first**, then add the page to `data/sources.json`, run `npm run kb:build`, then `kb:verify-sources` and `kb:validate`:
+| Where | What |
+|---|---|
+| `backend/data/profile/*.txt` | Reviewed profile text, one file per document (home, about, services ×3, contact) |
+| `backend/data/sources.json` | One entry per document with `origin: "profile"`, `profile_file`, `title`, `url` (the intended site page) and `updated_at` |
+| `backend/data/kb.json` | Output of `npm run kb:build` (no network needed for profile entries) |
 
-| Fact | Where it was | Needed on the site |
-|---|---|---|
-| Legal name PT Inpartner Optima Integra | v2.0 home/about | live Contact page already shows it; add it to the page that is cited |
-| 5-stage consulting approach | v2.0 about | publish on About |
-| Track record "90+ projects, 70+ clients, 10+ foreign-related" | v2.0 FAQ | publish, with an owner-approved wording |
-| FAQ and chatbot boundaries | v2.0 FAQ (`/faq/` is 404) | create `/faq/` |
-| Phone number | v2.0 contact | owner must confirm the correct number; the Contact page shows more than one |
+Only company facts are included: identity and legal name, **vision** ("The Most Trusted Consulting Partner To help create positive and endure changes in Local and Global Coverage."), tagline and positioning, history (2009 origin, 2019 consulting model), values, competitive advantages, the five official service groups and their sub-services, 8 industry sectors, thematic experience, 14 countries, the 5-stage approach, company-stated figures (90+ projects, 70+ clients, 10+ foreign-related), need-to-service routing and official contact details (including +62 859 3454 8202). Parts of the profile that are instructions to the chatbot (governance, response rules, target-audience CTAs, source priority) are **not** knowledge-base text; the rules live in `backend/src/services/scope.ts` and `chat.ts`. The "20+ years" statement is kept with the profile's own caveat: it describes strategic advisory experience, not the age of the legal entity.
+
+The two market pages (`/cross-border-market-entry-advisor/`, `/distribution-partner-sourcing-advisory/`) also keep the text that is live on the site today.
+
+### Editing the knowledge base
+
+1. Edit the `.txt` file under `backend/data/profile/` (plain text, one fact per line).
+2. `cd backend && npm run kb:build && npm run kb:validate && npm test && npm run eval:retrieval -- --min-stopped=1`.
+3. Review the `kb.json` diff, then `npm run kb:push` (or deploy the file).
+
+### Verification against the site
+
+`npm run kb:verify-sources` lists profile documents as `PROF` (not checked). **Before launch run `npm run kb:verify-sources -- --strict`**; it fails until the site pages carry the same text. [site-content-request.md](site-content-request.md) lists what the site needs to publish. Until then a source link may lead to a page that does not yet say the same thing. The owner accepted this while the site is under construction.
 
 ## What is indexed (verified 2026-10-14)
 

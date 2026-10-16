@@ -8,7 +8,7 @@
 ![Node.js 20.11+](https://img.shields.io/badge/Node.js-20.11%2B-339933)
 ![Version 0.2.2](https://img.shields.io/badge/version-0.2.2-informational)
 
-> **Status: 0.2.2, verified locally, not deployed. Not ready for production: owner decisions and a live-model evaluation are still open.** On 2026-10-16 the knowledge base was restored to the site snapshot (5 pages, `npm run kb:verify-sources` passes 5/5 against the live site) because KB v2.0 was not supported by the pages it cites (0–8%, `/faq/` is 404). Company-profile facts (legal name, track record, FAQ, phone) are left out until they are published on the site. See [docs/knowledge-base.md](docs/knowledge-base.md) and the [2026-10-15 audit](docs/audit-2026-10-15.md). All automated suites pass locally on SQLite with a mock model. The real Gemini model has **not** been evaluated, and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy.
+> **Status: 0.2.2, verified locally, not deployed. Not ready for production: the website is still being built and the live-model evaluation is open.** The knowledge base is the owner's INPARTNER Knowledge Base v2.0 (6 documents, `backend/data/profile/`). Its text is not yet on the cited website pages, so `npm run kb:verify-sources --strict` fails until the site publishes it. See [docs/knowledge-base.md](docs/knowledge-base.md) and the [2026-10-15 audit](docs/audit-2026-10-15.md). All automated suites pass locally on SQLite with a mock model. The real Gemini model has **not** been evaluated, and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy.
 
 ## Contents
 
@@ -142,9 +142,9 @@ scripts/test-all.sh               # backend, KB validation, evaluation, phpcs, P
 |---|---|---|
 | Backend | `cd backend && npm test` | 119 / 119 |
 | Knowledge base | `npm run kb:validate` | 0 errors |
-| Cited pages contain the KB text (network) | `npm run kb:verify-sources` | 5 / 5 documents pass (restored snapshot, 2026-10-16; KB v2.0 failed 7 / 7, audit F1) |
-| Offline evaluation, design set | `npm run eval:retrieval -- --min-stopped=1` | 48 / 48 answerable reach the model with the right page, 0 false refusals; 48 / 48 unanswerable stopped |
-| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 26 / 26 answerable; 24 / 29 unanswerable stopped (refreshed 2026-10-16; 5 reach the model and rely on its refusal, see evaluation.md) |
+| Cited pages contain the KB text (network) | `npm run kb:verify-sources` | 6 documents are owner-approved profile text (not checked against the site); `--strict` fails until the site publishes them (audit F1) |
+| Offline evaluation, design set | `npm run eval:retrieval -- --min-stopped=1` | 49 / 49 answerable reach the model with the right page, 0 false refusals; 49 / 49 unanswerable stopped |
+| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 29 / 29 answerable; 21 / 25 unanswerable stopped (refreshed 2026-10-16; 4 reach the model and rely on its refusal, see evaluation.md) |
 | Static analysis | `cd plugin/wp-knowledge-chat/tests && vendor/bin/phpcs` | 0 findings |
 | Plugin (real WordPress) | `vendor/bin/phpunit` | 125 / 125 |
 | Widget | `npm run test:widget` | 34 / 34 |
@@ -187,14 +187,14 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 
 ## Known limitations
 
-- The knowledge base is the 5-page site snapshot. Company-profile facts (legal name, "90+ projects / 70+ clients", FAQ, phone number) are not in it because they are not published on the site; see [docs/knowledge-base.md](docs/knowledge-base.md).
+- The knowledge base text comes from the owner's Knowledge Base v2.0, not from the website, which is still being built. Source links point to the intended pages; some have little or no content yet (for example Cross-Border M&A, and `/faq/` is not used). Re-verify with `kb:verify-sources --strict` once the site is published.
 - Answer quality with the real Gemini model has not been measured yet.
 - Each question is answered on its own: follow-ups such as "tell me more" lack context.
 - The assistant knows only 5 approved pages. The Cross-Border M&A page is empty and there is no FAQ or pricing page, so many questions get the fallback.
 - Backend rate limits and the replay cache are in memory, so run a single instance.
 - Out-of-scope detection is keyword-based (English/Indonesian/Korean) and can be evaded by rephrasing; the model and the claim check are the second line.
 - Korean and Indonesian questions are matched against the English pages through curated term maps, not translation. Questions using words outside the map get the fallback; add terms when the evaluation shows misses.
-- No phone number is in the knowledge base: the live contact page shows more than one number (one a placeholder) and the owner has not confirmed which is correct, so the bot gives none.
+- The knowledge base gives +62 859 3454 8202 as the phone number (confirmed in the owner's profile). The live contact page still shows two other numbers, one a template placeholder; fix the page.
 - Leads are stored in WordPress (private post type) and e-mailed to the admin; see the privacy section of [readme.txt](plugin/wp-knowledge-chat/readme.txt). Retention is "until deleted" unless configured.
 - Not yet tested with MySQL, LiteSpeed Cache or on real mobile devices.
 

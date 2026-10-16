@@ -11,7 +11,9 @@ WordPress plugin-guideline pass. Details: [docs/wp-compliance.md](docs/wp-compli
 - Admin screens no longer use inline `<script>`, `onsubmit` or `style` attributes (CSP-friendly). Script and styles are enqueued on the plugin's three screens only.
 
 ### Changed
-- Knowledge base restored to the live-site snapshot (`kb.json`, `sources.json` from `a895e24`, 5 documents). KB v2.0 text was not on the cited pages (`kb:verify-sources` 0–8%, `/faq/` 404); the snapshot passes 5/5. Company-profile facts (legal name, track record, FAQ, phone) are left out until published on the site. Evaluation labels adjusted accordingly; `kb-audit` test again asserts that no phone number is in the KB.
+- **Knowledge base is now the owner's INPARTNER Knowledge Base v2.0 (Sept 2026)**, kept as reviewed text in `backend/data/profile/*.txt` and listed in `sources.json` with `origin: "profile"`. `npm run kb:build` assembles `kb.json` from it without network access. It covers legal name, corrected vision ("The Most Trusted Consulting Partner To help create positive and endure changes in Local and Global Coverage."), history, values, advantages, the five service groups, 8 sectors, 14 countries, the 5-stage approach, company-stated figures (90+ / 70+ / 10+), need-to-service routing and official contact details including +62 859 3454 8202. Six documents; internal notes (target audience, governance rules) are not part of it.
+- The website is still being built, so this text is not yet on the cited pages. `kb:verify-sources` lists those documents as `PROF` (not checked); `--strict` fails them and is the gate before production launch.
+- Evaluation: design set 49/49 answerable and 49/49 unanswerable stopped; held-out 29/29 and 21/25. Labels changed only where content differs from the profile (`faq-13`, `h-a12`); `h-a10` was moved to the design set after its heading in the profile was reworded.
 
 ### Fixed
 - Uninstall on multisite removed data from the main site only; it now loops over every site.

@@ -20,6 +20,19 @@ export interface SourceEntry {
   exclude_patterns?: string[];
   /** The page may be missing from the snapshot (for example, published without body text yet). */
   optional?: boolean;
+  /**
+   * "site" (default): text is built from the published WordPress page.
+   * "profile": text is the owner-approved company profile in `profile_file`
+   * (relative to data/). It is NOT fetched from the site, so `kb:verify-sources`
+   * cannot confirm it against the cited page until the site publishes it.
+   */
+  origin?: 'site' | 'profile';
+  profile_file?: string;
+  /** Required for profile entries: the page the answer cites, and its title. */
+  url?: string;
+  title?: string;
+  /** Required for profile entries: ISO timestamp of the approved profile text. */
+  updated_at?: string;
 }
 
 export interface SourcesFile {
@@ -74,6 +87,17 @@ export function parseSourcesFile(data: unknown): SourcesFile {
       else if (wpIds.has(entry.wp_id)) problems.push(`${where}: duplicate wp_id ${entry.wp_id}`);
       else wpIds.add(entry.wp_id);
       if (!(DOCUMENT_CATEGORIES as readonly string[]).includes(entry?.category)) problems.push(`${where}: invalid category`);
+      if (entry?.origin !== undefined && entry.origin !== 'site' && entry.origin !== 'profile') problems.push(`${where}: origin must be "site" or "profile"`);
+      if (entry?.origin === 'profile') {
+        if (typeof entry.profile_file !== 'string' || !/^[a-z0-9][a-z0-9._/-]*\.txt$/.test(entry.profile_file) || entry.profile_file.includes('..')) problems.push(`${where}: profile_file must be a relative .txt path`);
+        if (typeof entry.title !== 'string' || entry.title.trim() === '') problems.push(`${where}: profile entries need a title`);
+        if (typeof entry.updated_at !== 'string' || Number.isNaN(Date.parse(entry.updated_at))) problems.push(`${where}: profile entries need an ISO updated_at`);
+        try {
+          if (new URL(String(entry.url)).protocol !== 'https:') problems.push(`${where}: url must be https`);
+        } catch {
+          problems.push(`${where}: profile entries need an https url`);
+        }
+      }
       if (entry?.optional !== undefined && typeof entry.optional !== 'boolean') problems.push(`${where}: optional must be a boolean`);
       (entry?.exclude_patterns ?? []).forEach((p, j) => compile(p, `${where}.exclude_patterns[${j}]`, problems));
     });

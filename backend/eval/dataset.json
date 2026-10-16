@@ -10,7 +10,7 @@
     "faq": "page-faq-routing-governance"
   },
   "items": [
-    { "id": "faq-01", "category": "faq", "language": "en", "question": "What services does Inpartner offer?", "expect": "answer", "expected_docs": ["home", "entry", "distribution"] },
+    { "id": "faq-01", "category": "faq", "language": "en", "question": "What services does Inpartner offer?", "expect": "answer", "expected_docs": ["home", "entry", "distribution", "crossborder"] },
     { "id": "faq-02", "category": "faq", "language": "en", "question": "What is Inpartner Global?", "expect": "answer", "expected_docs": ["home", "about"] },
     { "id": "faq-03", "category": "faq", "language": "en", "question": "How can I contact Inpartner?", "expect": "answer", "expected_docs": ["contact"] },
     { "id": "faq-04", "category": "faq", "language": "en", "question": "What is Inpartner's email address?", "expect": "answer", "expected_docs": ["contact"] },
@@ -18,12 +18,12 @@
     { "id": "faq-06", "category": "faq", "language": "en", "question": "What does the Cross Border Market Entry Advisor service include?", "expect": "answer", "expected_docs": ["entry"] },
     { "id": "faq-07", "category": "faq", "language": "en", "question": "What is Distribution Partner Sourcing Advisory?", "expect": "answer", "expected_docs": ["distribution"] },
     { "id": "faq-08", "category": "faq", "language": "en", "question": "What is Inpartner's approach to cross-border expansion?", "expect": "answer", "expected_docs": ["entry", "about"] },
-    { "id": "faq-09", "category": "faq", "language": "en", "question": "Which markets does Inpartner focus on?", "expect": "answer", "expected_docs": ["entry"] },
+    { "id": "faq-09", "category": "faq", "language": "en", "question": "Which markets does Inpartner focus on?", "expect": "answer", "expected_docs": ["entry", "crossborder"] },
     { "id": "faq-10", "category": "faq", "language": "en", "question": "Who does Inpartner support?", "expect": "answer", "expected_docs": ["entry", "distribution", "home", "about"] },
     { "id": "faq-11", "category": "faq", "language": "en", "question": "Does Inpartner help with due diligence on distribution partners?", "expect": "answer", "expected_docs": ["distribution"] },
     { "id": "faq-12", "category": "faq", "language": "en", "question": "What is Corporate Advisory at Inpartner?", "expect": "answer", "expected_docs": ["home", "entry"] },
-    { "id": "faq-13", "category": "faq", "language": "en", "question": "What does Operations Advisory involve?", "expect": "answer", "expected_docs": ["home", "entry"] },
-    { "id": "faq-14", "category": "faq", "language": "en", "question": "What is Inpartner's phone number?", "expect": "either", "expected_docs": [], "forbidden": ["0192", "555-0120", "859[ -]?3454"], "note": "Phone number excluded from the knowledge base until Inpartner confirms which one is correct (footer +62 859… vs Contact page +62 896…). Restored to the site snapshot on 2026-10-16." },
+    { "id": "faq-13", "category": "faq", "language": "en", "question": "What does Operations Advisory involve?", "expect": "fallback", "expected_docs": [], "note": "Relabelled 2026-10-16: 'Operations Advisory' was website teaser copy; it is not in the official service portfolio of the owner's Knowledge Base v2.0." },
+    { "id": "faq-14", "category": "faq", "language": "en", "question": "What is Inpartner's phone number?", "expect": "answer", "expected_docs": ["contact"], "forbidden": ["0192", "555-0120"], "note": "Phone number +62 859 3454 8202 is confirmed authoritative in Company Profile v2.0." },
     { "id": "faq-15", "category": "faq", "language": "en", "question": "Does Inpartner offer negotiation support?", "expect": "answer", "expected_docs": ["distribution", "entry"] },
 
     { "id": "para-01", "category": "paraphrase", "language": "en", "question": "I want to sell my products in Indonesia through local distributors. Can you help?", "expect": "answer", "expected_docs": ["distribution", "entry"] },
@@ -42,7 +42,7 @@
     { "id": "para-id-04", "category": "paraphrase", "language": "id", "question": "Apakah Inpartner membantu perusahaan asing masuk ke pasar Indonesia?", "expect": "answer", "expected_docs": ["entry", "distribution"] },
     { "id": "para-id-05", "category": "paraphrase", "language": "id", "question": "Apa itu layanan pencarian mitra distribusi?", "expect": "answer", "expected_docs": ["distribution"] },
     { "id": "para-id-06", "category": "paraphrase", "language": "id", "question": "Ceritakan tentang Inpartner.", "expect": "answer", "expected_docs": ["about", "home"] },
-    { "id": "para-id-07", "category": "paraphrase", "language": "id", "question": "Bagaimana pendekatan Inpartner dalam ekspansi lintas negara?", "expect": "answer", "expected_docs": ["entry", "about"] },
+    { "id": "para-id-07", "category": "paraphrase", "language": "id", "question": "Bagaimana pendekatan Inpartner dalam ekspansi lintas negara?", "expect": "answer", "expected_docs": ["entry", "crossborder", "about"] },
 
     { "id": "amb-01", "category": "ambiguous", "language": "en", "question": "Tell me more.", "expect": "either", "expected_docs": [] },
     { "id": "amb-02", "category": "ambiguous", "language": "en", "question": "Partners?", "expect": "either", "expected_docs": ["distribution", "entry"] },
@@ -123,6 +123,7 @@
     {"id": "fu-01", "category": "followup", "language": "en", "question": "Tell me more about the due diligence part.", "expect": "answer", "expected_docs": ["distribution"], "history": [{"role": "user", "text": "What is Distribution Partner Sourcing Advisory?"}, {"role": "model", "text": "Inpartner helps companies identify distributors, assess them through due diligence and structure commercial terms."}]},
     {"id": "fu-02", "category": "followup", "language": "id", "question": "Bagaimana dengan uji kelayakannya?", "expect": "either", "expected_docs": ["distribution"], "history": [{"role": "user", "text": "Apa itu Distribution Partner Sourcing Advisory?"}, {"role": "model", "text": "Inpartner membantu mencari distributor, melakukan uji kelayakan dan menyusun ketentuan komersial."}], "note": "Indonesian follow-up without service keywords; retrieval relies on the previous user turn."},
     {"id": "fu-03", "category": "followup", "language": "en", "question": "How much does that cost?", "expect": "fallback", "expected_docs": [], "forbidden": ["\\$\\s?\\d", "Rp\\s?\\d", "USD", "IDR"], "history": [{"role": "user", "text": "What is Distribution Partner Sourcing Advisory?"}, {"role": "model", "text": "Inpartner helps companies identify and assess distributors."}]},
-    {"id": "fu-ko-01", "category": "followup", "language": "ko", "question": "그 서비스 비용은 얼마인가요?", "expect": "fallback", "expected_docs": [], "history": [{"role": "user", "text": "Distribution Partner Sourcing Advisory는 무엇인가요?"}, {"role": "model", "text": "Inpartner는 유통 파트너 발굴과 실사를 지원합니다."}]}
+    {"id": "fu-ko-01", "category": "followup", "language": "ko", "question": "그 서비스 비용은 얼마인가요?", "expect": "fallback", "expected_docs": [], "history": [{"role": "user", "text": "Distribution Partner Sourcing Advisory는 무엇인가요?"}, {"role": "model", "text": "Inpartner는 유통 파트너 발굴과 실사를 지원합니다."}]},
+    { "id": "para-h-a10", "category": "paraphrase", "language": "en", "question": "What makes Inpartner different?", "expect": "answer", "expected_docs": ["home"], "note": "Moved from holdout.json (h-a10) on 2026-10-16: it exposed that the profile called its differentiators only 'Competitive advantages'; the heading now says what makes INPARTNER different." }
   ]
 }

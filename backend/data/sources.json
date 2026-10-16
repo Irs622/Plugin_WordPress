@@ -1,5 +1,5 @@
 {
-  "$comment": "Approved knowledge-base sources. Only pages listed under 'documents' are fetched and indexed. Review with the Inpartner team before every rebuild. 'optional' pages may be absent (for example, no body text yet); every other page must build or kb:build fails. Verified against the live site on 2026-10-14.",
+  "$comment": "Approved knowledge-base sources for the INPARTNER Client-Facing AI Assistant. 2026-10-16: documents are owner-approved text from INPARTNER Knowledge Base v2.0 (Sept 2026) kept in data/profile/ (origin \"profile\"). The website is still being built, so these texts are not yet on the cited pages: `kb:verify-sources --strict` fails until the site publishes them. Rebuild with `npm run kb:build`.",
   "site": "https://inpartnerglobal.com",
   "global_exclude_patterns": [
     "^start a convertation$",
@@ -18,54 +18,73 @@
     "^our service$",
     "^\\+?[\\d\\s().-]{9,}$"
   ],
-  "$phone_policy": "Lines that consist only of a phone number are excluded: the footer (+62 859-3454-8202) and the Contact page (+62 896 2831 0192) disagree. Remove the pattern above only after the Inpartner content owner confirms the authoritative number.",
+  "$phone_policy": "The official phone number +62 859 3454 8202 is confirmed in the owner's Knowledge Base v2.0. The disputed number 0192 and the template placeholder 555-0120 are excluded.",
   "documents": [
     {
       "id": "page-196-home",
       "wp_id": 196,
       "category": "home",
-      "exclude_patterns": [
-        "^recent insight$",
-        "^financial insights and inspiration$",
-        "^insight$",
-        "^our clients$",
-        "MORA Stock",
-        "Rupiah Takes a Hit"
-      ],
-      "notes": "News teasers and the empty 'Our Clients' heading are removed: the linked posts are not approved sources."
+      "origin": "profile",
+      "profile_file": "profile/home.txt",
+      "title": "INPARTNER — PT Inpartner Optima Integra",
+      "url": "https://inpartnerglobal.com/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Identity, legal name, vision, tagline, history, values and competitive advantages from the INPARTNER Knowledge Base v2.0 (Sept 2026)."
     },
     {
       "id": "page-223-about",
       "wp_id": 223,
-      "category": "about"
+      "category": "about",
+      "origin": "profile",
+      "profile_file": "profile/about.txt",
+      "title": "About INPARTNER (PT Inpartner Optima Integra)",
+      "url": "https://inpartnerglobal.com/about-us/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Positioning, 5-stage approach, company-stated track record (90+, 70+, 10+) and content scope from Knowledge Base v2.0."
     },
     {
       "id": "page-628-cross-border-market-entry",
       "wp_id": 628,
-      "category": "service"
+      "category": "service",
+      "origin": "profile",
+      "profile_file": "profile/services-strategy-market.txt",
+      "title": "Cross Border Market Entry Advisor",
+      "url": "https://inpartnerglobal.com/cross-border-market-entry-advisor/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Service groups 1 and 3 from Knowledge Base v2.0, plus the published market-entry page text."
     },
     {
       "id": "page-918-distribution-partner-sourcing",
       "wp_id": 918,
-      "category": "service"
+      "category": "service",
+      "origin": "profile",
+      "profile_file": "profile/services-investment-distribution.txt",
+      "title": "Distribution Partner Sourcing Advisory",
+      "url": "https://inpartnerglobal.com/distribution-partner-sourcing-advisory/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Service group 2 from Knowledge Base v2.0, plus the published distribution-partner page text."
     },
     {
       "id": "page-1052-cross-border-ma",
       "wp_id": 1052,
       "category": "service",
-      "notes": "Page body was empty on 2026-10-14. The build skips empty pages; it will be indexed automatically once content is published.",
-      "optional": true
+      "origin": "profile",
+      "profile_file": "profile/services-crossborder-expertise.txt",
+      "title": "Cross-Border & Technology Advisory",
+      "url": "https://inpartnerglobal.com/cross-border-ma-advisory/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Service groups 4 and 5, industry expertise, thematic experience and 14-country coverage from Knowledge Base v2.0. The live page had no body text on 2026-10-16."
     },
     {
       "id": "page-445-contact",
       "wp_id": 445,
       "category": "contact",
-      "exclude_patterns": [
-        "\\(406\\) 555-0120",
-        "take control of your financial future",
-        "^call us$"
-      ],
-      "notes": "Excluded lines look like theme placeholder text (a fictional 555 number). The phone number is excluded by the global phone pattern until the authoritative number is confirmed; the 'Call Us' label is removed with it. The contact e-mail domain (inpartner.id) differs from the website domain: confirm with Inpartner."
+      "origin": "profile",
+      "profile_file": "profile/contact.txt",
+      "title": "Contact INPARTNER",
+      "url": "https://inpartnerglobal.com/contact/",
+      "updated_at": "2026-10-16T00:00:00Z",
+      "notes": "Official contact details (incl. +62 859 3454 8202 confirmed in the profile) and need-to-service routing from Knowledge Base v2.0."
     }
   ],
   "excluded": [

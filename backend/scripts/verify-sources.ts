@@ -12,11 +12,17 @@
  * --min-coverage (default 0.8). Needs network access to the live site, so
  * it is not part of CI; run it before deploying a new kb.json and on staging.
  *
- * Usage: npm run kb:verify-sources [-- --kb=data/kb.json --min-coverage=0.8 --show-missing]
+ * Documents whose source entry has origin "profile" (owner-approved company
+ * profile text, see data/sources.json) are listed as PROFILE and not fetched:
+ * they are not on the site yet. With --strict they count as failures, so use
+ * --strict as the gate before a production launch.
+ *
+ * Usage: npm run kb:verify-sources [-- --kb=data/kb.json --sources=data/sources.json --min-coverage=0.8 --show-missing --strict]
  */
 import { readFile } from 'node:fs/promises';
 import { htmlToText } from '../src/lib/html-to-text.js';
 import { KnowledgeBaseStore } from '../src/services/knowledge-base.js';
+import { parseSourcesFile } from '../src/services/kb-audit.js';
 
 const MAX_PAGE_BYTES = 2 * 1024 * 1024;
 const MIN_LINE_CHARS = 25;
@@ -85,8 +91,22 @@ async function main(): Promise<void> {
   const loaded = store.loadFrom(JSON.parse(await readFile(kbPath, 'utf8')));
   if (loaded.rejected.length > 0) throw new Error(`${loaded.rejected.length} document(s) in ${kbPath} are invalid; run kb:validate`);
 
+  const strict = process.argv.includes('--strict');
+  const profileIds = new Set(
+    parseSourcesFile(JSON.parse(await readFile(arg('sources', 'data/sources.json'), 'utf8')))
+      .documents.filter((e) => e.origin === 'profile')
+      .map((e) => e.id),
+  );
+
   let failed = 0;
+  let unverified = 0;
   for (const doc of store.all()) {
+    if (profileIds.has(doc.id)) {
+      unverified += 1;
+      if (strict) failed += 1;
+      console.log(`${strict ? 'FAIL' : 'PROF'} ${doc.id}: owner-approved profile text, not verified against ${doc.url}`);
+      continue;
+    }
     let result: { status: number; text: string };
     try {
       result = await fetchPage(doc.url);
@@ -107,7 +127,8 @@ async function main(): Promise<void> {
     console.log(`${ok ? 'OK  ' : 'FAIL'} ${doc.id}: ${cov.found}/${cov.checked} lines found on ${doc.url} (${(ratio * 100).toFixed(0)}%)`);
     if (showMissing) for (const line of cov.missing) console.log(`       missing: ${line.slice(0, 140)}`);
   }
-  console.log(failed === 0 ? 'All cited pages contain their knowledge-base text.' : `${failed} document(s) are not supported by the page they cite.`);
+  if (unverified > 0 && !strict) console.log(`${unverified} document(s) come from the owner-approved profile and were not checked against the site (use --strict before launch).`);
+  console.log(failed === 0 ? 'All checked pages contain their knowledge-base text.' : `${failed} document(s) are not supported by the page they cite.`);
   process.exit(failed === 0 ? 0 : 1);
 }
 

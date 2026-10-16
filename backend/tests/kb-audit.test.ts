@@ -77,9 +77,10 @@ describe('auditKnowledgeBase', () => {
     assert.deepEqual(errors, []);
   });
 
-  it('keeps phone numbers out of the committed knowledge base until the owner confirms one', async () => {
+  it('keeps disputed phone numbers out and verifies authoritative phone in knowledge base', async () => {
     const text = await readFile('data/kb.json', 'utf8');
-    assert.ok(!/896\s*2831\s*0192|859[\s-]*3454[\s-]*8202|555-0120/.test(text));
+    assert.ok(!/896 2831 0192|555-0120/.test(text));
+    assert.ok(text.includes('+62 859 3454 8202'));
   });
 });
 
@@ -102,6 +103,25 @@ describe('parseSourcesFile', () => {
         /invalid category/.test(err.message),
     );
     assert.throws(() => parseSourcesFile({ site: 'http://inpartnerglobal.com', global_exclude_patterns: [], documents: [{ id: 'a', wp_id: 1, category: 'home' }] }), /https/);
+  });
+
+  it('accepts a complete profile entry and rejects incomplete or unsafe ones', () => {
+    const profile = { id: 'a', wp_id: 1, category: 'home', origin: 'profile', profile_file: 'profile/home.txt', title: 'Home', url: 'https://inpartnerglobal.com/', updated_at: '2026-10-16T00:00:00Z' };
+    const file = (entry: object) => ({ site: 'https://inpartnerglobal.com', global_exclude_patterns: [], documents: [entry] });
+    assert.doesNotThrow(() => parseSourcesFile(file(profile)));
+    assert.throws(() => parseSourcesFile(file({ ...profile, profile_file: '../secrets.txt' })), /profile_file/);
+    assert.throws(() => parseSourcesFile(file({ ...profile, profile_file: undefined })), /profile_file/);
+    assert.throws(() => parseSourcesFile(file({ ...profile, url: 'http://inpartnerglobal.com/' })), /https url|url must be https/);
+    assert.throws(() => parseSourcesFile(file({ ...profile, title: ' ' })), /title/);
+    assert.throws(() => parseSourcesFile(file({ ...profile, updated_at: 'yesterday' })), /updated_at/);
+    assert.throws(() => parseSourcesFile(file({ ...profile, origin: 'import' })), /origin/);
+  });
+
+  it('marks every committed document as owner-approved profile text with the correct vision', async () => {
+    const sources = parseSourcesFile(JSON.parse(await readFile('data/sources.json', 'utf8')));
+    assert.ok(sources.documents.every((e) => e.origin === 'profile'));
+    const kbText = await readFile('data/kb.json', 'utf8');
+    assert.ok(kbText.includes('The Most Trusted Consulting Partner To help create positive and endure changes in Local and Global Coverage.'));
   });
 });
 

@@ -14,6 +14,7 @@
  * Usage: npm run kb:build [-- --sources=data/sources.json --out=data/kb.json]
  */
 import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { htmlToText } from '../src/lib/html-to-text.js';
 import { auditKnowledgeBase, excludePatternsFor, MIN_DOCUMENT_CHARS, parseSourcesFile } from '../src/services/kb-audit.js';
 import { KnowledgeBaseStore, validateDocument, writeKnowledgeBaseFile, type KnowledgeDocument } from '../src/services/knowledge-base.js';
@@ -46,6 +47,22 @@ async function main(): Promise<void> {
       if (entry.optional) console.warn(`SKIP ${entry.id} (optional): ${reason}`);
       else failures.push(`${entry.id}: ${reason}`);
     };
+
+    if (entry.origin === 'profile') {
+      // Owner-approved profile text kept in the repository (no network). Not verified against the site.
+      try {
+        const text = (await readFile(resolve(dirname(sourcesPath), entry.profile_file as string), 'utf8')).replace(/\r\n/g, '\n').trim();
+        const doc = validateDocument(
+          { id: entry.id, title: entry.title, url: entry.url, text, category: entry.category, status: 'publish', updated_at: entry.updated_at },
+          allowedHosts,
+        );
+        documents.push(doc);
+        console.log(`PROF ${doc.id}: ${doc.text.length} chars from ${entry.profile_file} -> ${doc.url} (not verified against the site)`);
+      } catch (err) {
+        skip(`invalid profile document (${err instanceof Error ? err.message : 'error'})`);
+      }
+      continue;
+    }
 
     const endpoint = new URL(`/wp-json/wp/v2/pages/${entry.wp_id}`, site);
     endpoint.searchParams.set('_fields', 'id,link,title,content,status,modified_gmt');
