@@ -36,6 +36,8 @@ bin/setup-wp.sh                      # → <repo>/.wp-test (WordPress 7.1.3, sym
 
 `setup-wp.sh` accepts a target directory as its first argument, and the environment variables `WP_VERSION` (default `7.1.3`) and `WP_URL` (default `http://127.0.0.1:8899`). Running it again recreates the install, including its database, from scratch.
 
+`bin/multisite-check.sh [zip]` network-activates the ZIP in a fresh two-site multisite (`<repo>/.wp-ms-test`) and checks that uninstall removes settings, metrics, leads and transients on every site.
+
 `bin/package-check.sh [zip]` verifies a built ZIP in a separate fresh install (`<repo>/.wp-zip-test`): checksum, no development files, install, activation defaults, deactivation keeps settings, uninstall removes option/transients/files, reinstall.
 
 Test users (local only): `admin` / `admin-pass-123`, `editor` / `editor-pass-123`, `subscriber` / `subscriber-pass-123`.

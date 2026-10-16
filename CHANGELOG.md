@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-10-16
+
+WordPress plugin-guideline pass. Details: [docs/wp-compliance.md](docs/wp-compliance.md).
+
+### Security
+- `Update URI: false` in the plugin header, so a same-slug plugin on WordPress.org cannot overwrite this private plugin through the update check.
+- Admin screens no longer use inline `<script>`, `onsubmit` or `style` attributes (CSP-friendly). Script and styles are enqueued on the plugin's three screens only.
+
+### Fixed
+- Uninstall on multisite removed data from the main site only; it now loops over every site.
+- Untranslatable admin strings (page categories, lead post-type label, configuration errors).
+- Plugin readme short description was 156 characters (limit 150).
+
+### Added
+- `tests/bin/multisite-check.sh`: installs the ZIP network-wide in a two-site network and checks that uninstall cleans both sites.
+- PHPUnit: admin screens contain no inline script/handler/style; admin assets load only on plugin screens.
+- Held-out evaluation set refreshed with 12 new, untuned questions (see [docs/evaluation.md](docs/evaluation.md)).
+
+### Known / not done
+- The live Gemini evaluation was attempted on 2026-10-16 and could not run: the provider rejected the configured API key (`auth`). Needs a valid key.
+
 ## [0.2.1] - 2026-10-15
 
 Audit and remediation of 0.2.0. Details and evidence: [docs/audit-2026-10-15.md](docs/audit-2026-10-15.md).

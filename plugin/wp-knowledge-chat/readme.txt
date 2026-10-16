@@ -4,7 +4,7 @@ Tags: chatbot, faq, ai assistant, knowledge base, gemini
 Requires at least: 6.4
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 0.2.1
+Stable tag: 0.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -163,6 +163,13 @@ Deactivating keeps the settings, leads and metrics. Deleting the plugin from the
 
 == Changelog ==
 
+= 0.2.2 =
+* Added `Update URI: false` to the plugin header, so a plugin with the same slug on WordPress.org can never be offered as an "update" and overwrite this one.
+* Admin screens no longer print inline JavaScript, `onsubmit` handlers or `style` attributes. They load `assets/js/admin.js` and `assets/css/admin.css`, on this plugin's screens only, so a strict Content-Security-Policy works.
+* More admin strings are translatable (page categories, lead post-type label, configuration errors); Bahasa Indonesia and Korean updated.
+* Uninstall on a multisite network now removes the plugin's data from every site, not only the main one.
+* Shorter readme description (150 characters).
+
 = 0.2.1 =
 * Security/privacy: leads are stored one per record (a flood of submissions can no longer push out earlier leads), with field length limits, a separate rate limit, a honeypot, duplicate suppression, mail-failure tracking, delete/export actions, retention filter and WordPress privacy exporter/eraser.
 * Security: password-protected pages are never indexed; content is rendered as an anonymous visitor for indexing.
@@ -178,6 +185,9 @@ Deactivating keeps the settings, leads and metrics. Deleting the plugin from the
 * Initial MVP: chat widget, four admin settings, signed REST proxy to the AI backend, rate limiting, source links, fallback, English and Indonesian interface.
 
 == Upgrade Notice ==
+
+= 0.2.2 =
+No settings or data changes. Purge the page cache so the new version query string is used. On a multisite network, uninstalling now cleans every site.
 
 = 0.2.1 =
 Existing leads are moved to the new storage automatically. After upgrading, open WP Knowledge Chat → Knowledge Base and sync your approved pages once: only synced pages receive automatic updates from now on. Purge the page cache.

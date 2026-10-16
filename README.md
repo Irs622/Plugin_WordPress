@@ -6,9 +6,9 @@
 ![WordPress 6.4+](https://img.shields.io/badge/WordPress-6.4%2B%20(tested%207.1.3)-21759b)
 ![PHP 8.1+](https://img.shields.io/badge/PHP-8.1%2B-777bb4)
 ![Node.js 20.11+](https://img.shields.io/badge/Node.js-20.11%2B-339933)
-![Version 0.2.1](https://img.shields.io/badge/version-0.2.1-informational)
+![Version 0.2.2](https://img.shields.io/badge/version-0.2.2-informational)
 
-> **Status: 0.2.1, verified locally, not deployed. Not ready for production; staging is blocked by one content decision.** The current knowledge base (KB v2.0) is not supported by the pages it cites (`npm run kb:verify-sources`: 0–8% of each document found on its page, `/faq/` is 404). See the [2026-10-15 audit](docs/audit-2026-10-15.md). All automated suites pass locally on SQLite with a mock model. The real Gemini model has **not** been evaluated, and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy.
+> **Status: 0.2.2, verified locally, not deployed. Not ready for production; staging is blocked by one content decision.** The current knowledge base (KB v2.0) is not supported by the pages it cites (`npm run kb:verify-sources`: 0–8% of each document found on its page, `/faq/` is 404). See the [2026-10-15 audit](docs/audit-2026-10-15.md). All automated suites pass locally on SQLite with a mock model. The real Gemini model has **not** been evaluated, and the plugin has not run on MySQL, LiteSpeed, the production host or a staging copy.
 
 ## Contents
 
@@ -138,18 +138,20 @@ bin/setup-wp.sh                   # creates <repo>/.wp-test (and its `wp` wrappe
 scripts/test-all.sh               # backend, KB validation, evaluation, phpcs, PHPUnit, widget, E2E + Chrome, packaging + ZIP lifecycle
 ```
 
-| Suite | Command | Result (2026-10-15, 0.2.1) |
+| Suite | Command | Result (2026-10-16, 0.2.2) |
 |---|---|---|
 | Backend | `cd backend && npm test` | 119 / 119 |
 | Knowledge base | `npm run kb:validate` | 0 errors |
 | Cited pages contain the KB text (network) | `npm run kb:verify-sources` | **7 / 7 documents fail** (see audit F1) |
 | Offline evaluation, design set | `npm run eval:retrieval -- --min-stopped=1` | 49 / 49 answerable reach the model with the right page, 0 false refusals; 48 / 48 unanswerable stopped |
-| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 25 / 25 answerable; 18 / 18 unanswerable stopped (6 items moved to the design set; refresh needed) |
+| Offline evaluation, held-out set | `node dist/eval/run-eval.js --mode=retrieval --dataset=eval/holdout.json` | 31 / 31 answerable; 21 / 24 unanswerable stopped (refreshed 2026-10-16 with 12 new untuned questions; 3 new ones reach the model, see evaluation.md) |
 | Static analysis | `cd plugin/wp-knowledge-chat/tests && vendor/bin/phpcs` | 0 findings |
-| Plugin (real WordPress) | `vendor/bin/phpunit` | 123 / 123 |
+| Plugin (real WordPress) | `vendor/bin/phpunit` | 125 / 125 |
 | Widget | `npm run test:widget` | 34 / 34 |
 | End-to-end + browser | `e2e/run.sh` | 12 / 12 HTTP, 16 / 16 Chrome (incl. Korean switch, axe on panel and lead form) |
 | ZIP lifecycle | `bin/package-check.sh` | credential scan, install, activate, 0.2.0 lead migration, deactivate, uninstall (removes leads), reinstall |
+| Multisite uninstall | `bin/multisite-check.sh` | network-activate in a two-site network; uninstall removes settings, metrics, leads and transients on both sites |
+| WordPress Plugin Check | `wp plugin check` on the built ZIP | no security errors; remaining findings are WordPress.org-only (see [docs/wp-compliance.md](docs/wp-compliance.md)) |
 
 The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (see [docs/evaluation.md](docs/evaluation.md)).
 
@@ -167,7 +169,7 @@ The live AI evaluation needs a Gemini key: `cd backend && npm run eval:live` (se
 Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs/deployment.md)):
 
 1. Deploy the backend to an HTTPS Node.js host (single instance) with its environment variables set.
-2. Build the plugin ZIP: `scripts/package-plugin.sh` → `dist/wp-knowledge-chat-0.2.1.zip`.
+2. Build the plugin ZIP: `scripts/package-plugin.sh` → `dist/wp-knowledge-chat-0.2.2.zip`.
 3. On **staging**: verify the ZIP checksum, add the `wp-config.php` constants, upload and activate the ZIP, and click **Test connection**. Keep the Contact URL at the homepage default unless the owner approves a dedicated contact page.
 4. Run `npm run eval:live` against the staging backend with a real Gemini key and have Inpartner review the answers.
 5. Go to production only with the site owner's explicit approval.
@@ -180,7 +182,7 @@ Summary (full guide with rollback and troubleshooting: [docs/deployment.md](docs
 | Developers | [Architecture](docs/architecture.md) · [Tech stack](docs/tech-stack.md) · [API contract](docs/api-contract.md) · [Backend README](backend/README.md) · [Plugin readme.txt](plugin/wp-knowledge-chat/readme.txt) · [Contributing](CONTRIBUTING.md) |
 | Operations | [Deployment, rollback & troubleshooting](docs/deployment.md) · [Knowledge base](docs/knowledge-base.md) |
 | Security | [Security design](docs/security.md) · [Security policy](SECURITY.md) |
-| Quality | [Audit 2026-10-15 (0.2.1)](docs/audit-2026-10-15.md) · [Audit report (0.1.0)](docs/audit-report.md) · [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
+| Quality | [WordPress guideline review (0.2.2)](docs/wp-compliance.md) · [Audit 2026-10-15 (0.2.1)](docs/audit-2026-10-15.md) · [Audit report (0.1.0)](docs/audit-report.md) · [Test report](docs/test-report.md) · [Evaluation](docs/evaluation.md) · [Plugin tests](plugin/wp-knowledge-chat/tests/README.md) · [Screenshots](docs/screenshots/) |
 | Product | [PRD](prd.md) · [Changelog](CHANGELOG.md) |
 
 ## Known limitations

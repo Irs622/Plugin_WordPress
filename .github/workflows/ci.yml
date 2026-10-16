@@ -149,6 +149,9 @@ jobs:
       - name: ZIP lifecycle check
         run: bash plugin/wp-knowledge-chat/tests/bin/package-check.sh
 
+      - name: Multisite uninstall check
+        run: bash plugin/wp-knowledge-chat/tests/bin/multisite-check.sh
+
       - name: Upload Plugin ZIP Artifact
         uses: actions/upload-artifact@v4
         with:

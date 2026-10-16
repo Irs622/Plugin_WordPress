@@ -77,6 +77,7 @@ ReadWritePaths=/opt/wkc/backend/data
 ```bash
 scripts/package-plugin.sh                              # dist/wp-knowledge-chat-<version>.zip + .sha256
 plugin/wp-knowledge-chat/tests/bin/package-check.sh    # checksum, no dev files, install/activate/deactivate/uninstall/reinstall
+plugin/wp-knowledge-chat/tests/bin/multisite-check.sh  # network install; uninstall cleans every site (only relevant for multisite)
 ```
 
 Before uploading anywhere, re-check the checksum on the machine that uploads it:

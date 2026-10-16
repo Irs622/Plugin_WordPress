@@ -44,6 +44,7 @@ Static analysis: `phpcs` with `WordPress.Security`, `WordPress.DB.PreparedSQL*` 
 - **Sent to Google Gemini:** the question plus retrieved public website excerpts. Under Google's API terms, data handling depends on the account tier. Review whether paid-tier "no training" terms are required before launch (PRD §12 Privacy).
 - **Logged by the backend:** event name, outcome, language, message *length*, latency, error kind. Never message text, IPs or secrets.
 - **Browser:** conversation in `sessionStorage` only (cleared when the tab closes).
+- **Content-Security-Policy (0.2.2):** the admin screens contain no inline script, event-handler attributes or `style` attributes; behaviour and styling load from `assets/js/admin.js` and `assets/css/admin.css`. The public widget already used enqueued assets. The only inline script on public pages is the JSON configuration (`wp_add_inline_script`).
 - **Lead capture (0.2.1):** name, e-mail, company and message in a private post type `wkc_lead`, visible only to `manage_options` users (no UI, REST, query var, export or core capabilities). Limits: field lengths, 3 per visitor per 10 min, 30 per site per hour, honeypot, duplicate suppression. Notification e-mail to the admin address; its delivery status is recorded. Kept until deleted (per lead, all, Tools → Erase Personal Data) or for `wp_knowledge_chat_lead_retention_days`. Deleted on uninstall. The retention period and privacy-policy wording are owner decisions.
 
 ## Residual risks / not covered

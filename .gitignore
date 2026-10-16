@@ -13,6 +13,7 @@ dist/
 # Local disposable WordPress installs used by tests
 .wp-test/
 .wp-zip-test/
+.wp-ms-test/
 
 # Live evaluation reports may contain provider output; review before committing
 backend/eval/report-live-*.json
