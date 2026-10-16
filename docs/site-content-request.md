@@ -1,5 +1,7 @@
 # Permintaan konten situs untuk Pemilik Situs Inpartner
 
+**Konteks.** Situs inpartnerglobal.com masih dalam pengerjaan, jadi wajar bila isinya belum sama dengan Company Profile v2.0 (sumber kebenaran untuk teks perusahaan). Dokumen ini adalah daftar yang perlu tayang di situs sebelum fakta itu dipakai chatbot. Basis pengetahuan chatbot mengikuti situs yang tayang, bukan sebaliknya.
+
 **Tujuan.** Chatbot hanya boleh menjawab dari teks yang benar-benar tayang di inpartnerglobal.com, karena setiap jawaban menautkan halaman sumbernya. Versi 2.0 dari "Company Profile" berisi fakta yang belum ada di situs, jadi fakta itu dikeluarkan dari chatbot pada 2026-10-16 (hasil cek: hanya 0–8% teksnya ditemukan di halaman yang dikutip, dan `/faq/` memberi 404). Dokumen ini daftar apa yang perlu ditayangkan agar fakta tersebut bisa dipakai chatbot lagi.
 
 **Yang diminta dari Anda:** (1) setujui atau koreksi teks di bagian B, (2) jawab 4 pertanyaan di bagian A, (3) tayangkan teks yang disetujui, lalu beri tahu tim teknis. Tim teknis akan membangun ulang basis pengetahuan dan memverifikasinya terhadap situs.
@@ -34,7 +36,13 @@ Sekarang: tidak ada nama legal, tahapan konsultasi, maupun angka kinerja.
 >
 > This structured framework ensures tailored advisory from problem diagnosis to measurable outcomes.
 
-### B2. Sejarah dan nilai perusahaan (di About atau Home)
+### B2. Visi, sejarah dan nilai perusahaan (di About atau Home)
+
+**Visi (final, sesuai tampilan desain situs).** Gunakan teks ini persis:
+
+> **Vision.** The Most Trusted Consulting Partner To help create positive and endure changes in Local and Global Coverage.
+
+Catatan: kalimat "Bridging Markets, Investment & Business Opportunities" di Company Profile v2.0 bukan visi. Pakai hanya sebagai kalimat positioning/tagline bila diinginkan. Teks visi di atas ditulis apa adanya; bila "endure" dimaksudkan "enduring", perbaiki di desain dan di sini.
 
 Hanya bila A3 sudah dijawab. Teks Company Profile:
 
