@@ -1,5 +1,5 @@
 {
-  "$comment": "Approved knowledge-base sources for INPARTNER Client-Facing AI Assistant (Knowledge Base v2.0, September 2026). Verified against authoritative 2026 Company Profile.",
+  "$comment": "Approved knowledge-base sources. Only pages listed under 'documents' are fetched and indexed. Review with the Inpartner team before every rebuild. 'optional' pages may be absent (for example, no body text yet); every other page must build or kb:build fails. Verified against the live site on 2026-10-14.",
   "site": "https://inpartnerglobal.com",
   "global_exclude_patterns": [
     "^start a convertation$",
@@ -16,10 +16,9 @@
     "^view all insight$",
     "^no content is added yet\\.?$",
     "^our service$",
-    "\\(406\\)\\s*555-0120",
-    "896\\s*2831\\s*0192"
+    "^\\+?[\\d\\s().-]{9,}$"
   ],
-  "$phone_policy": "The official phone number +62 859 3454 8202 is confirmed in the 2026 Company Profile v2.0. Disputed number 0192 and demo placeholder 555-0120 are excluded.",
+  "$phone_policy": "Lines that consist only of a phone number are excluded: the footer (+62 859-3454-8202) and the Contact page (+62 896 2831 0192) disagree. Remove the pattern above only after the Inpartner content owner confirms the authoritative number.",
   "documents": [
     {
       "id": "page-196-home",
@@ -29,34 +28,33 @@
         "^recent insight$",
         "^financial insights and inspiration$",
         "^insight$",
+        "^our clients$",
         "MORA Stock",
         "Rupiah Takes a Hit"
       ],
-      "notes": "Home overview, company identity, history (2009 & 2019), values, and competitive advantages."
+      "notes": "News teasers and the empty 'Our Clients' heading are removed: the linked posts are not approved sources."
     },
     {
       "id": "page-223-about",
       "wp_id": 223,
-      "category": "about",
-      "notes": "Company profile, 5-stage consulting approach, and client evidence metrics (90+, 70+, 10+)."
+      "category": "about"
     },
     {
       "id": "page-628-cross-border-market-entry",
       "wp_id": 628,
-      "category": "service",
-      "notes": "Market Access & Business Expansion and Strategy & Corporate Advisory services."
+      "category": "service"
     },
     {
       "id": "page-918-distribution-partner-sourcing",
       "wp_id": 918,
-      "category": "service",
-      "notes": "Distribution partner sourcing and Investment & Project Advisory services."
+      "category": "service"
     },
     {
       "id": "page-1052-cross-border-ma",
       "wp_id": 1052,
       "category": "service",
-      "notes": "Cross-Border & Technology Advisory, Human Capital & Organization, 8 sectors, and 14 countries."
+      "notes": "Page body was empty on 2026-10-14. The build skips empty pages; it will be indexed automatically once content is published.",
+      "optional": true
     },
     {
       "id": "page-445-contact",
@@ -67,13 +65,7 @@
         "take control of your financial future",
         "^call us$"
       ],
-      "notes": "Official contact information (+62 859 3454 8202, corporatesecretary@inpartner.id, Pakuwon Tower), audience CTAs, and routing."
-    },
-    {
-      "id": "page-faq-routing-governance",
-      "wp_id": 1001,
-      "category": "faq",
-      "notes": "Need-to-service routing matrix, track record figures, and AI knowledge governance boundaries."
+      "notes": "Excluded lines look like theme placeholder text (a fictional 555 number). The phone number is excluded by the global phone pattern until the authoritative number is confirmed; the 'Call Us' label is removed with it. The contact e-mail domain (inpartner.id) differs from the website domain: confirm with Inpartner."
     }
   ],
   "excluded": [

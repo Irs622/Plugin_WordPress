@@ -140,7 +140,7 @@ cd dist && shasum -a 256 -c wp-knowledge-chat-0.2.0.zip.sha256
 | 16 | Monitoring: backend log alerts on `llm_failed`, `chat_auth_failed`, `rate_limited scope=daily`; uptime check on `/api/health`; Google Cloud budget alert | ☐ | ☐ | ☐ |
 | 17 | `DAILY_REQUEST_LIMIT` set from the approved budget | **B** (budget not decided) | ☐ | ☐ |
 | 18 | Rollback rehearsed (disable, deactivate, restore previous `kb.json`) | L (disable/enable in E2E) | ☐ | ☐ |
-| 19 | `npm run kb:verify-sources` passes against the site the backend cites (every KB document is on its page) | **B** (fails: audit F1) | ☐ | ☐ |
+| 19 | `npm run kb:verify-sources` passes against the site the backend cites (every KB document is on its page) | L (passes 5/5 on the restored snapshot, 2026-10-16; re-run before staging) | ☐ | ☐ |
 | 20 | Upgrade 0.2.0 → 0.2.1 keeps every lead; a widget lead reaches a staging inbox; a mail failure shows "Failed" on the dashboard | L (migration in `package-check.sh`, mail mocked) | ☐ | ☐ |
 | 21 | Lead abuse: 4th submission in 10 min → 429; honeypot stores nothing | L (PHPUnit) | ☐ | ☐ |
 | 22 | Sync: synced page edit/rename/unpublish/protect/trash each reflected in answers; backend stopped → pending notice → **Retry now** clears it | L (PHPUnit, mocked backend) | ☐ | ☐ |

@@ -10,6 +10,9 @@ WordPress plugin-guideline pass. Details: [docs/wp-compliance.md](docs/wp-compli
 - `Update URI: false` in the plugin header, so a same-slug plugin on WordPress.org cannot overwrite this private plugin through the update check.
 - Admin screens no longer use inline `<script>`, `onsubmit` or `style` attributes (CSP-friendly). Script and styles are enqueued on the plugin's three screens only.
 
+### Changed
+- Knowledge base restored to the live-site snapshot (`kb.json`, `sources.json` from `a895e24`, 5 documents). KB v2.0 text was not on the cited pages (`kb:verify-sources` 0–8%, `/faq/` 404); the snapshot passes 5/5. Company-profile facts (legal name, track record, FAQ, phone) are left out until published on the site. Evaluation labels adjusted accordingly; `kb-audit` test again asserts that no phone number is in the KB.
+
 ### Fixed
 - Uninstall on multisite removed data from the main site only; it now loops over every site.
 - Untranslatable admin strings (page categories, lead post-type label, configuration errors).

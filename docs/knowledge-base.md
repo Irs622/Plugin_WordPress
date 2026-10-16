@@ -1,5 +1,19 @@
 # Knowledge base
 
+## Status 2026-10-16: restored to the site snapshot
+
+The knowledge base is the 5-page snapshot from commit `a895e24` (home, about-us, contact, cross-border market entry, distribution partner sourcing). `npm run kb:verify-sources` passes 5/5 against the live site. The Cross-Border M&A page is not included (optional, no usable text on the site).
+
+KB v2.0 (commit `4b9e6b2`) was removed because its text is not on the pages it cites. To bring those facts back, **publish them on the site first**, then add the page to `data/sources.json`, run `npm run kb:build`, then `kb:verify-sources` and `kb:validate`:
+
+| Fact | Where it was | Needed on the site |
+|---|---|---|
+| Legal name PT Inpartner Optima Integra | v2.0 home/about | live Contact page already shows it; add it to the page that is cited |
+| 5-stage consulting approach | v2.0 about | publish on About |
+| Track record "90+ projects, 70+ clients, 10+ foreign-related" | v2.0 FAQ | publish, with an owner-approved wording |
+| FAQ and chatbot boundaries | v2.0 FAQ (`/faq/` is 404) | create `/faq/` |
+| Phone number | v2.0 contact | owner must confirm the correct number; the Contact page shows more than one |
+
 ## What is indexed (verified 2026-10-14)
 
 Pages were discovered through the site's public WordPress REST API (`/wp-json/wp/v2/pages`, `/posts`). Only published content is public there.
