@@ -226,3 +226,31 @@ msgstr "홈"
 #: includes
 msgid "Article"
 msgstr "기사"
+
+#: includes/class-plugin.php
+msgid "Chat assistant"
+msgstr "채팅 어시스턴트"
+
+#: includes/class-plugin.php
+msgid "Questions and answers"
+msgstr "질문과 답변"
+
+#: includes/class-plugin.php
+msgid "Conversation storage"
+msgstr "대화 저장"
+
+#: includes/class-plugin.php
+msgid "Consultation requests"
+msgstr "상담 요청"
+
+#: includes/class-plugin.php
+msgid "Visitors can ask questions in a chat assistant. The text of each question is sent to our AI backend service and, together with excerpts of public pages of this website, to Google Gemini to write the answer. The visitor's IP address, cookies and identity are not sent; a salted one-way identifier is used for rate limiting."
+msgstr "방문자는 채팅 어시스턴트로 질문할 수 있습니다. 각 질문의 텍스트는 당사의 AI 백엔드 서비스로 전송되며, 이 웹사이트의 공개 페이지 발췌문과 함께 Google Gemini로 전달되어 답변을 작성합니다. 방문자의 IP 주소, 쿠키, 신원 정보는 전송되지 않으며, 요청 빈도 제한에는 솔트가 적용된 단방향 식별자가 사용됩니다."
+
+#: includes/class-plugin.php
+msgid "The conversation is kept only in the visitor's browser (session storage) and is cleared when the tab is closed. This site stores short-lived rate-limit counters, aggregate counts of questions and the 25 most recent question snippets, from which e-mail addresses, phone numbers, links and long numbers have been removed."
+msgstr "대화는 방문자의 브라우저(세션 저장소)에만 보관되며 탭을 닫으면 삭제됩니다. 이 사이트는 단기간 유지되는 요청 빈도 카운터, 질문의 집계 수, 그리고 이메일 주소, 전화번호, 링크, 긴 숫자를 제거한 최근 질문 발췌문 25개를 저장합니다."
+
+#: includes/class-plugin.php
+msgid "Visitors can optionally send a consultation request. The name, e-mail address, company and message they enter are stored on this site and e-mailed to the site administrator. The IP address is not stored. Requests are kept until an administrator deletes them, or for the retention period the site owner has set, and can be exported or erased through Tools → Export Personal Data and Erase Personal Data."
+msgstr "방문자는 선택적으로 상담 요청을 보낼 수 있습니다. 입력한 이름, 이메일 주소, 회사, 메시지는 이 사이트에 저장되고 사이트 관리자에게 이메일로 전송됩니다. IP 주소는 저장되지 않습니다. 요청은 관리자가 삭제할 때까지, 또는 사이트 소유자가 정한 보관 기간 동안 유지되며, 도구 → 개인 데이터 내보내기 및 개인 데이터 지우기를 통해 내보내거나 삭제할 수 있습니다."

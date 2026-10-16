@@ -14,7 +14,7 @@ The backend runs on Netlify Functions at `https://inpartner-chat-api.netlify.app
 | `POST /api/chat` without signature | 401 `unauthorized`, generic message |
 | `POST /api/index` without or with a wrong token | 401 `unauthorized` (it returns 501 only to an authorised caller on Netlify) |
 | `GET /api/index` | 405, `Allow: POST` |
-| `GET /robots.txt` | 200; `/` is a 404 page (no placeholder index published) |
+| `GET /robots.txt` | 200. `/` was a 404 page; a `noindex` placeholder (`backend/public/index.html`) is published from the next deploy |
 | Security headers | `Content-Security-Policy: default-src 'none'`, HSTS, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on API responses; no CORS headers for a foreign origin |
 
 **Not checked (needs `CHAT_SHARED_SECRET`):** that the shared secret matches WordPress, that the deployed `GEMINI_API_KEY` is valid, and which `kb.json` version is deployed. Use **Test connection** in WordPress, then one real question.
@@ -160,6 +160,7 @@ cd dist && shasum -a 256 -c wp-knowledge-chat-0.2.0.zip.sha256
 | 17 | `DAILY_REQUEST_LIMIT` set from the approved budget | **B** (budget not decided) | ☐ | ☐ |
 | 18 | Rollback rehearsed (disable, deactivate, restore previous `kb.json`) | L (disable/enable in E2E) | ☐ | ☐ |
 | 19 | `npm run kb:verify-sources` passes against the site the backend cites (every KB document is on its page) | **B** (`--strict` fails until the site publishes the profile text, 2026-10-16) | ☐ | ☐ |
+| 19a | Settings → Privacy → Policy Guide shows the "WP Knowledge Chat" suggested text; the site's privacy policy mentions the AI assistant, Google Gemini and the consultation form | L (text added in 0.2.2) | ☐ (owner pastes it into the policy) | ☐ |
 | 20 | Upgrade 0.2.0 → 0.2.1 keeps every lead; a widget lead reaches a staging inbox; a mail failure shows "Failed" on the dashboard | L (migration in `package-check.sh`, mail mocked) | ☐ | ☐ |
 | 21 | Lead abuse: 4th submission in 10 min → 429; honeypot stores nothing | L (PHPUnit) | ☐ | ☐ |
 | 22 | Sync: synced page edit/rename/unpublish/protect/trash each reflected in answers; backend stopped → pending notice → **Retry now** clears it | L (PHPUnit, mocked backend) | ☐ | ☐ |

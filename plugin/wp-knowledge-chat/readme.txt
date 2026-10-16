@@ -155,7 +155,7 @@ REST endpoint: `POST /wp-json/wp-knowledge-chat/v1/chat` with `{"message": "..."
 * **Consultation requests (leads).** When a visitor submits the optional form, their name, e-mail, company and message are stored in WordPress (a private post type `wkc_lead`, visible only to administrators on Analytics & Leads) and e-mailed to the site's admin address (filter `wp_knowledge_chat_lead_notification_email`). The IP address is not stored.
 * Leads are kept until an administrator deletes them (per lead, "Delete all", or Tools → Erase Personal Data). Set a retention period with `add_filter( 'wp_knowledge_chat_lead_retention_days', fn() => 180 );`. Leads can be exported as CSV or per person via Tools → Export Personal Data.
 * Abuse limits on the lead form: 3 submissions per visitor per 10 minutes, 30 per site per hour (filter `wp_knowledge_chat_lead_limit_per_hour`), a hidden honeypot field, field length limits and suppression of identical resubmissions.
-* Site owners should mention the AI assistant, Google Gemini and the consultation form in their privacy policy.
+* Site owners should mention the AI assistant, Google Gemini and the consultation form in their privacy policy. Suggested wording is added to Settings → Privacy → Policy Guide.
 
 == Uninstall ==
 
@@ -164,6 +164,7 @@ Deactivating keeps the settings, leads and metrics. Deleting the plugin from the
 == Changelog ==
 
 = 0.2.2 =
+* Suggested privacy-policy text now appears under Settings → Privacy → Policy Guide (English, Bahasa Indonesia, Korean).
 * Added `Update URI: false` to the plugin header, so a plugin with the same slug on WordPress.org can never be offered as an "update" and overwrite this one.
 * Admin screens no longer print inline JavaScript, `onsubmit` handlers or `style` attributes. They load `assets/js/admin.js` and `assets/css/admin.css`, on this plugin's screens only, so a strict Content-Security-Policy works.
 * More admin strings are translatable (page categories, lead post-type label, configuration errors); Bahasa Indonesia and Korean updated.

@@ -226,3 +226,31 @@ msgstr "Beranda"
 #: includes
 msgid "Article"
 msgstr "Artikel"
+
+#: includes/class-plugin.php
+msgid "Chat assistant"
+msgstr "Asisten obrolan"
+
+#: includes/class-plugin.php
+msgid "Questions and answers"
+msgstr "Pertanyaan dan jawaban"
+
+#: includes/class-plugin.php
+msgid "Conversation storage"
+msgstr "Penyimpanan percakapan"
+
+#: includes/class-plugin.php
+msgid "Consultation requests"
+msgstr "Permintaan konsultasi"
+
+#: includes/class-plugin.php
+msgid "Visitors can ask questions in a chat assistant. The text of each question is sent to our AI backend service and, together with excerpts of public pages of this website, to Google Gemini to write the answer. The visitor's IP address, cookies and identity are not sent; a salted one-way identifier is used for rate limiting."
+msgstr "Pengunjung dapat mengajukan pertanyaan melalui asisten obrolan. Teks setiap pertanyaan dikirim ke layanan backend AI kami dan, bersama kutipan halaman publik situs ini, ke Google Gemini untuk menyusun jawaban. Alamat IP, cookie, dan identitas pengunjung tidak dikirim; pengenal satu arah yang diberi salt digunakan untuk pembatasan laju."
+
+#: includes/class-plugin.php
+msgid "The conversation is kept only in the visitor's browser (session storage) and is cleared when the tab is closed. This site stores short-lived rate-limit counters, aggregate counts of questions and the 25 most recent question snippets, from which e-mail addresses, phone numbers, links and long numbers have been removed."
+msgstr "Percakapan hanya disimpan di browser pengunjung (session storage) dan dihapus saat tab ditutup. Situs ini menyimpan penghitung pembatasan laju berumur pendek, jumlah agregat pertanyaan, dan 25 cuplikan pertanyaan terbaru yang alamat e-mail, nomor telepon, tautan, dan angka panjangnya telah dihapus."
+
+#: includes/class-plugin.php
+msgid "Visitors can optionally send a consultation request. The name, e-mail address, company and message they enter are stored on this site and e-mailed to the site administrator. The IP address is not stored. Requests are kept until an administrator deletes them, or for the retention period the site owner has set, and can be exported or erased through Tools → Export Personal Data and Erase Personal Data."
+msgstr "Pengunjung dapat secara opsional mengirim permintaan konsultasi. Nama, alamat e-mail, perusahaan, dan pesan yang mereka isi disimpan di situs ini dan dikirim lewat e-mail ke administrator situs. Alamat IP tidak disimpan. Permintaan disimpan sampai administrator menghapusnya, atau selama masa retensi yang ditetapkan pemilik situs, dan dapat diekspor atau dihapus melalui Alat → Ekspor Data Pribadi dan Hapus Data Pribadi."

@@ -251,6 +251,14 @@ final class AdminAndWidgetTest extends TestCase {
 		}
 	}
 
+	public function test_privacy_policy_suggestion_describes_the_data_flow(): void {
+		$html = Plugin::privacy_policy_content();
+		$this->assertStringContainsString( 'Google Gemini', $html );
+		$this->assertStringContainsString( 'Consultation requests', $html );
+		$this->assertStringNotContainsString( '<script', $html );
+		$this->assertNotFalse( has_action( 'admin_init', array( Plugin::class, 'add_privacy_policy_content' ) ) );
+	}
+
 	/* ---------- Widget loading ---------- */
 
 	public function test_widget_loads_when_enabled_and_configured(): void {

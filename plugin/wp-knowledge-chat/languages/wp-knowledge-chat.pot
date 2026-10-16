@@ -224,3 +224,31 @@ msgstr ""
 #: includes
 msgid "Article"
 msgstr ""
+
+#: includes/class-plugin.php
+msgid "Chat assistant"
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "Questions and answers"
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "Conversation storage"
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "Consultation requests"
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "Visitors can ask questions in a chat assistant. The text of each question is sent to our AI backend service and, together with excerpts of public pages of this website, to Google Gemini to write the answer. The visitor's IP address, cookies and identity are not sent; a salted one-way identifier is used for rate limiting."
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "The conversation is kept only in the visitor's browser (session storage) and is cleared when the tab is closed. This site stores short-lived rate-limit counters, aggregate counts of questions and the 25 most recent question snippets, from which e-mail addresses, phone numbers, links and long numbers have been removed."
+msgstr ""
+
+#: includes/class-plugin.php
+msgid "Visitors can optionally send a consultation request. The name, e-mail address, company and message they enter are stored on this site and e-mailed to the site administrator. The IP address is not stored. Requests are kept until an administrator deletes them, or for the retention period the site owner has set, and can be exported or erased through Tools → Export Personal Data and Erase Personal Data."
+msgstr ""

@@ -21,6 +21,8 @@ WordPress plugin-guideline pass. Details: [docs/wp-compliance.md](docs/wp-compli
 - Plugin readme short description was 156 characters (limit 150).
 
 ### Added
+- Suggested privacy-policy text in **Settings → Privacy → Policy Guide** (`wp_add_privacy_policy_content`), translated to Bahasa Indonesia and Korean: what the assistant sends to Google Gemini, what is stored, and consultation requests.
+- Backend: `backend/public/index.html`, a `noindex` placeholder, so `/` on Netlify no longer returns a 404 page.
 - `tests/bin/multisite-check.sh`: installs the ZIP network-wide in a two-site network and checks that uninstall cleans both sites.
 - PHPUnit: admin screens contain no inline script/handler/style; admin assets load only on plugin screens.
 - Held-out evaluation set refreshed with 12 new, untuned questions (see [docs/evaluation.md](docs/evaluation.md)).

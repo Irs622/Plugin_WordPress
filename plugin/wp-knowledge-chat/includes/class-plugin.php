@@ -26,6 +26,7 @@ final class Plugin {
 		add_action( 'init', array( self::class, 'load_textdomain' ) );
 		add_action( 'init', array( Settings::class, 'register' ) );
 		add_action( 'init', array( Analytics::class, 'register_post_type' ) );
+		add_action( 'admin_init', array( self::class, 'add_privacy_policy_content' ) );
 		add_filter( 'wp_privacy_personal_data_exporters', array( Analytics::class, 'register_exporter' ) );
 		add_filter( 'wp_privacy_personal_data_erasers', array( Analytics::class, 'register_eraser' ) );
 		// While the stored value equals the registered default, update_option() takes the add_option() path.
@@ -57,6 +58,27 @@ final class Plugin {
 		Settings::install();
 		Analytics::register_post_type();
 		Analytics::maybe_migrate_legacy_leads();
+	}
+
+	/**
+	 * Adds suggested text to Settings → Privacy → Policy Guide, so the site owner can paste
+	 * it into the privacy policy. Describes what the assistant sends and stores.
+	 */
+	public static function add_privacy_policy_content(): void {
+		if ( function_exists( 'wp_add_privacy_policy_content' ) ) {
+			wp_add_privacy_policy_content( __( 'WP Knowledge Chat', 'wp-knowledge-chat' ), self::privacy_policy_content() );
+		}
+	}
+
+	public static function privacy_policy_content(): string {
+		$html  = '<h2>' . esc_html__( 'Chat assistant', 'wp-knowledge-chat' ) . '</h2>';
+		$html .= '<h3>' . esc_html__( 'Questions and answers', 'wp-knowledge-chat' ) . '</h3>';
+		$html .= '<p>' . esc_html__( 'Visitors can ask questions in a chat assistant. The text of each question is sent to our AI backend service and, together with excerpts of public pages of this website, to Google Gemini to write the answer. The visitor\'s IP address, cookies and identity are not sent; a salted one-way identifier is used for rate limiting.', 'wp-knowledge-chat' ) . '</p>';
+		$html .= '<h3>' . esc_html__( 'Conversation storage', 'wp-knowledge-chat' ) . '</h3>';
+		$html .= '<p>' . esc_html__( 'The conversation is kept only in the visitor\'s browser (session storage) and is cleared when the tab is closed. This site stores short-lived rate-limit counters, aggregate counts of questions and the 25 most recent question snippets, from which e-mail addresses, phone numbers, links and long numbers have been removed.', 'wp-knowledge-chat' ) . '</p>';
+		$html .= '<h3>' . esc_html__( 'Consultation requests', 'wp-knowledge-chat' ) . '</h3>';
+		$html .= '<p>' . esc_html__( 'Visitors can optionally send a consultation request. The name, e-mail address, company and message they enter are stored on this site and e-mailed to the site administrator. The IP address is not stored. Requests are kept until an administrator deletes them, or for the retention period the site owner has set, and can be exported or erased through Tools → Export Personal Data and Erase Personal Data.', 'wp-knowledge-chat' ) . '</p>';
+		return $html;
 	}
 
 	/**
