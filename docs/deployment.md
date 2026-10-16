@@ -2,6 +2,25 @@
 
 > Nothing in this repository has been deployed. Production (inpartnerglobal.com) was not modified; it was only read through public GET requests to build the knowledge base. Every step below needs explicit authorisation from the site owner, and **staging comes first**. Production changes, releases and secret rotation need a separate, explicit approval.
 
+
+## Deployed backend (Netlify), checked 2026-10-16
+
+The backend runs on Netlify Functions at `https://inpartner-chat-api.netlify.app`. Checked from outside, without secrets:
+
+| Check | Result |
+|---|---|
+| `GET /api/health` (unsigned) | 200 `{"status":"ok","knowledge_base":"ready"}` |
+| `GET /api/health` with a wrong signature | 401 `unauthorized` |
+| `POST /api/chat` without signature | 401 `unauthorized`, generic message |
+| `POST /api/index` without or with a wrong token | 401 `unauthorized` (it returns 501 only to an authorised caller on Netlify) |
+| `GET /api/index` | 405, `Allow: POST` |
+| `GET /robots.txt` | 200; `/` is a 404 page (no placeholder index published) |
+| Security headers | `Content-Security-Policy: default-src 'none'`, HSTS, `Referrer-Policy: no-referrer`, `Cache-Control: no-store` on API responses; no CORS headers for a foreign origin |
+
+**Not checked (needs `CHAT_SHARED_SECRET`):** that the shared secret matches WordPress, that the deployed `GEMINI_API_KEY` is valid, and which `kb.json` version is deployed. Use **Test connection** in WordPress, then one real question.
+
+**Known limit of Netlify:** rate limits, the daily model-call budget and the replay cache are per function instance, so the effective limits are higher than configured and a restart resets them. Set a spending cap on the Gemini key itself. See *Scaling decision* above.
+
 ## Status legend
 
 | Mark | Meaning |
