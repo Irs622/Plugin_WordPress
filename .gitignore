@@ -14,6 +14,7 @@ dist/
 .wp-test/
 .wp-zip-test/
 .wp-ms-test/
+.wp-mysql-test/
 
 # Live evaluation reports may contain provider output; review before committing
 backend/eval/report-live-*.json

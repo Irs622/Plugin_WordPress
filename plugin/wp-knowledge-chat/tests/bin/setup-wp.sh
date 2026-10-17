@@ -3,6 +3,12 @@
 # integration and end-to-end tests. Never point this at a production site.
 #
 # Usage: tests/bin/setup-wp.sh [target-dir]   (default: <repo>/.wp-test)
+#
+# Database: SQLite by default. With WKC_DB=mysql it uses a real MySQL/MariaDB
+# server instead (WKC_DB_HOST, WKC_DB_NAME, WKC_DB_USER, WKC_DB_PASSWORD;
+# defaults 127.0.0.1:33306 / wkc / root / test, see tests/bin/mysql-check.sh).
+# The database must be empty and disposable (the WP-CLI `db` commands need a
+# mysql client, which is not required here).
 set -euo pipefail
 
 WP_VERSION="${WP_VERSION:-7.1.3}"
@@ -12,6 +18,8 @@ REPO_DIR="$(cd "$PLUGIN_DIR/../.." && pwd)"
 TARGET="${1:-$REPO_DIR/.wp-test}"
 WP_DIR="$TARGET/wordpress"
 WP_URL="${WP_URL:-http://127.0.0.1:8899}"
+WKC_DB="${WKC_DB:-sqlite}"
+export WKC_DB_HOST="${WKC_DB_HOST:-127.0.0.1:33306}" WKC_DB_NAME="${WKC_DB_NAME:-wkc}" WKC_DB_USER="${WKC_DB_USER:-root}" WKC_DB_PASSWORD="${WKC_DB_PASSWORD:-test}"
 
 mkdir -p "$TARGET/cache"
 cd "$TARGET"
@@ -32,12 +40,13 @@ rm -rf "$WP_DIR" "$TARGET/db"
 mkdir -p "$TARGET/extract"
 unzip -q -o "cache/wordpress-$WP_VERSION.zip" -d "$TARGET/extract"
 mv "$TARGET/extract/wordpress" "$WP_DIR"
-unzip -q -o cache/sqlite-database-integration.zip -d "$WP_DIR/wp-content/plugins"
+[ "$WKC_DB" = mysql ] || unzip -q -o cache/sqlite-database-integration.zip -d "$WP_DIR/wp-content/plugins"
 rm -rf "$TARGET/extract"
 
 SQLITE_DIR="$WP_DIR/wp-content/plugins/sqlite-database-integration"
-sed -e "s#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#$SQLITE_DIR#" -e "s#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#" \
+[ "$WKC_DB" = mysql ] || sed -e "s#{SQLITE_IMPLEMENTATION_FOLDER_PATH}#$SQLITE_DIR#" -e "s#{SQLITE_PLUGIN}#sqlite-database-integration/load.php#" \
   "$SQLITE_DIR/db.copy" > "$WP_DIR/wp-content/db.php"
+[ "$WKC_DB" = mysql ] && rm -f "$WP_DIR/wp-content/db.php"
 
 cp "$WP_DIR/wp-config-sample.php" "$WP_DIR/wp-config.php"
 php -r '
@@ -46,8 +55,11 @@ $salts = "";
 foreach (["AUTH_KEY","SECURE_AUTH_KEY","LOGGED_IN_KEY","NONCE_KEY","AUTH_SALT","SECURE_AUTH_SALT","LOGGED_IN_SALT","NONCE_SALT"] as $k) {
   $c = preg_replace("/define\\(\\s*.$k.,\\s*.put your unique phrase here.\\s*\\);/", "define( \x27$k\x27, \x27" . bin2hex(random_bytes(32)) . "\x27 );", $c);
 }
+if ( getenv( "WKC_DB" ) === "mysql" ) {
+  $c = str_replace( array( "database_name_here", "username_here", "password_here", "localhost" ), array( getenv( "WKC_DB_NAME" ), getenv( "WKC_DB_USER" ), getenv( "WKC_DB_PASSWORD" ), getenv( "WKC_DB_HOST" ) ), $c );
+}
 $c = str_replace("define( \x27WP_DEBUG\x27, false );", "define( \x27WP_DEBUG\x27, true );", $c);
-$extra = "define( \x27DB_DIR\x27, __DIR__ . \x27/../db\x27 );\ndefine( \x27WP_DEBUG_LOG\x27, __DIR__ . \x27/../debug.log\x27 );\ndefine( \x27WP_DEBUG_DISPLAY\x27, false );\ndefine( \x27WP_ENVIRONMENT_TYPE\x27, \x27local\x27 );\n";
+$extra = ( getenv( "WKC_DB" ) === "mysql" ? "" : "define( \x27DB_DIR\x27, __DIR__ . \x27/../db\x27 );\n" ) . "define( \x27WP_DEBUG_LOG\x27, __DIR__ . \x27/../debug.log\x27 );\ndefine( \x27WP_DEBUG_DISPLAY\x27, false );\ndefine( \x27WP_ENVIRONMENT_TYPE\x27, \x27local\x27 );\n";
 $extra .= "if ( getenv( \x27WKC_BACKEND_URL\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_BACKEND_URL\x27, getenv( \x27WKC_BACKEND_URL\x27 ) ); }\n";
 $extra .= "if ( getenv( \x27WKC_SHARED_SECRET\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_SHARED_SECRET\x27, getenv( \x27WKC_SHARED_SECRET\x27 ) ); }\n";
 $extra .= "if ( getenv( \x27WKC_INDEX_TOKEN\x27 ) ) { define( \x27WP_KNOWLEDGE_CHAT_INDEX_API_TOKEN\x27, getenv( \x27WKC_INDEX_TOKEN\x27 ) ); }\n";
@@ -91,10 +103,10 @@ chmod +x "$TARGET/wp"
 
 $WP core install --url="$WP_URL" --title="WKC Test Site" --admin_user=admin --admin_password=admin-pass-123 --admin_email=admin@example.test --skip-email
 $WP rewrite structure '/%postname%/' --hard >/dev/null
-$WP plugin activate sqlite-database-integration >/dev/null 2>&1 || true
+[ "$WKC_DB" = mysql ] || $WP plugin activate sqlite-database-integration >/dev/null 2>&1 || true
 $WP user create editor editor@example.test --role=editor --user_pass=editor-pass-123 >/dev/null
 $WP user create subscriber subscriber@example.test --role=subscriber --user_pass=subscriber-pass-123 >/dev/null
 $WP post create --post_type=page --post_title="Contact" --post_name=contact --post_status=publish >/dev/null
 $WP plugin activate wp-knowledge-chat >/dev/null
 
-echo "WordPress $($WP core version) ready at $WP_DIR (url $WP_URL)"
+echo "WordPress $($WP core version) [$WKC_DB] ready at $WP_DIR (url $WP_URL)"

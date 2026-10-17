@@ -3,6 +3,19 @@
 > Nothing in this repository has been deployed. Production (inpartnerglobal.com) was not modified; it was only read through public GET requests to build the knowledge base. Every step below needs explicit authorisation from the site owner, and **staging comes first**. Production changes, releases and secret rotation need a separate, explicit approval.
 
 
+## Netlify environment setup
+
+In Netlify: *Site configuration → Environment variables*. Never commit these values; the build's secrets scan is already configured for the public ones (see `netlify.toml`).
+
+| Variable | Value |
+|---|---|
+| `GEMINI_API_KEY` | A new key from Google AI Studio. Put a spending cap on the key, because Netlify's in-memory limits are per function instance. |
+| `CHAT_SHARED_SECRET` | 32+ random characters (`cd backend && npm run secret`). Same value as `WP_KNOWLEDGE_CHAT_SHARED_SECRET` in `wp-config.php`. |
+| `INDEX_API_TOKEN` | Optional on Netlify: `/api/index` returns 501 there. The KB changes by deploying `backend/data/kb.json`. |
+| `DAILY_REQUEST_LIMIT` | Daily model-call budget, from the owner's monthly budget. |
+
+Then **Deploys → Trigger deploy**, set the two constants in `wp-config.php` (`WP_KNOWLEDGE_CHAT_BACKEND_URL`, `WP_KNOWLEDGE_CHAT_SHARED_SECRET`), click **Test connection** in WordPress, and ask one question (for example "What is Inpartner's vision?"). The answer should quote the vision from the profile.
+
 ## Deployed backend (Netlify), checked 2026-10-16
 
 The backend runs on Netlify Functions at `https://inpartner-chat-api.netlify.app`. Checked from outside, without secrets:
@@ -146,7 +159,7 @@ cd dist && shasum -a 256 -c wp-knowledge-chat-0.2.0.zip.sha256
 | 3 | `npm run kb:validate` passes; `GET /api/health` → 200 | L | ☐ | ☐ |
 | 4 | ZIP checksum verified; install/activate/deactivate/uninstall/reinstall clean | L (`package-check.sh`) | ☐ | ☐ |
 | 5 | Plugin activates without PHP notices (`WP_DEBUG_LOG` on) | L (PHP 8.5.5) | ☐ (PHP 8.5.11) | ☐ |
-| 6 | Settings save on **MySQL 8.0**; invalid values rejected; non-admins blocked | L (SQLite only) | ☐ | ☐ |
+| 6 | Settings save on **MySQL 8.0**; invalid values rejected; non-admins blocked | L (SQLite, and MySQL 8.0.46 via `mysql-check.sh`: 126 tests, ZIP install/uninstall) | ☐ | ☐ |
 | 7 | **Test connection** passes; with a deliberately wrong secret it reports "rejected the shared secret" | L | ☐ | ☐ |
 | 8 | Widget opens/closes on desktop and real mobile devices; header menu, Elementor sections and popups still work | L (Chrome emulation) | ☐ | ☐ |
 | 9 | Keyboard and screen reader (VoiceOver/NVDA) walkthrough | L (keyboard, axe-core only) | ☐ | ☐ |

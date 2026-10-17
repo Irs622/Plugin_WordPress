@@ -260,7 +260,10 @@ final class SettingsTest extends TestCase {
 		$this->assertNotNull( $row );
 		$this->assertStringNotContainsString( 'secret', strtolower( $row->option_value ) );
 		$this->assertStringNotContainsString( (string) getenv( 'WKC_SHARED_SECRET' ), $row->option_value );
-		$tables = $wpdb->get_col( "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%knowledge%'" );
+		// SQLite (default test database) and MySQL (tests/bin/mysql-check.sh) list tables differently.
+		$tables = defined( 'SQLITE_DB_DROPIN_VERSION' )
+			? $wpdb->get_col( "SELECT name FROM sqlite_master WHERE type = 'table' AND name LIKE '%knowledge%'" )
+			: $wpdb->get_col( $wpdb->prepare( 'SHOW TABLES LIKE %s', '%' . $wpdb->esc_like( 'knowledge' ) . '%' ) );
 		$this->assertSame( array(), $tables, 'no custom tables are created' );
 	}
 }

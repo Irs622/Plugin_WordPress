@@ -150,6 +150,7 @@ scripts/test-all.sh               # backend, KB validation, evaluation, phpcs, P
 | Widget | `npm run test:widget` | 34 / 34 |
 | End-to-end + browser | `e2e/run.sh` | 12 / 12 HTTP, 16 / 16 Chrome (incl. Korean switch, axe on panel and lead form) |
 | ZIP lifecycle | `bin/package-check.sh` | credential scan, install, activate, 0.2.0 lead migration, deactivate, uninstall (removes leads), reinstall |
+| MySQL 8.0 | `bin/mysql-check.sh` (needs Docker) | PHPUnit 126 / 126 and ZIP install/uninstall on MySQL 8.0.46 |
 | Multisite uninstall | `bin/multisite-check.sh` | network-activate in a two-site network; uninstall removes settings, metrics, leads and transients on both sites |
 | WordPress Plugin Check | `wp plugin check` on the built ZIP | no security errors; remaining findings are WordPress.org-only (see [docs/wp-compliance.md](docs/wp-compliance.md)) |
 
